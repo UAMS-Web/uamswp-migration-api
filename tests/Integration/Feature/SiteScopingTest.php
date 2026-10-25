@@ -30,14 +30,14 @@ it('serves the current site when no site parameter is given', function (): void 
     expect($response->get_status())->toBe(200)
         ->and(payload($response, 'site', 'id'))->toBe(get_current_blog_id())
         ->and(payload($response, 'site', 'is_multisite'))->toBeTrue();
-});
+})->skip(! is_multisite(), networkOnly('it asserts a network; SingleSiteTest.php covers the single site'));
 
 it('refuses a site that does not exist in the network', function (): void {
     $response = indexAsSuperAdmin(999999);
 
     expect($response->get_status())->toBe(404)
         ->and(errorCode($response))->toBe('uamswp_migration_api_unknown_site');
-});
+})->skip(! is_multisite(), networkOnly('a single site refuses every `?site=` before looking the site up'));
 
 /*
  * The switch branch itself, and the restore that goes with it.
@@ -70,7 +70,7 @@ it('restores the original site after an error response', function (): void {
 
     expect(indexAsSuperAdmin(999999)->get_status())->toBe(404)
         ->and(get_current_blog_id())->toBe($original);
-});
+})->skip(! is_multisite(), networkOnly('a single site refuses every `?site=` before looking the site up'));
 
 /*
  * A 401 or 403 is the commonest way a request into this namespace ends, and it

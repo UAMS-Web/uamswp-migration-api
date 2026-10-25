@@ -80,7 +80,7 @@ it('refuses a site administrator who is not a super admin', function (): void {
     actAs('administrator');
 
     expect(migrationApiGet('/uamswp-migration/v1/')->get_status())->toBe(403);
-});
+})->skip(! is_multisite(), networkOnly('only a network separates a site administrator from a super admin'));
 
 it('admits a super admin', function (): void {
     actAsSuperAdmin();
@@ -90,7 +90,7 @@ it('admits a super admin', function (): void {
 
 it('resolves the required capability to a network capability on multisite', function (): void {
     expect(Auth::capability())->toBe('manage_network_options');
-});
+})->skip(! is_multisite(), networkOnly('the capability is a network capability only on a network'));
 
 it('lets the capability filter change what is required', function (): void {
     $filter = static fn (): string => 'read';

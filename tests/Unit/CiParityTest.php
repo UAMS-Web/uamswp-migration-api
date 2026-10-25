@@ -206,6 +206,112 @@ function ciWorkflowChain(): array
     return $chain;
 }
 
+/**
+ * The Pest processes `composer test` starts, in order, as ci.yml runs them.
+ *
+ * Walks the `test` script the way Composer does: an `@name` entry runs that
+ * script, `@putenv` sets a variable for every later entry in the same
+ * Composer process, and the rest start a Pest process. Each process is reduced
+ * to its binary, its arguments, and the two settings that are constants in the
+ * suite, so it compares with scripts/pest-suites.php by value. Simulating the
+ * carry-over is the point: a script that forgot to reset a variable an earlier
+ * one set would run the wrong install shape, and this is where that shows.
+ *
+ * @return list<array{pest: string, args: string, single_site: bool, secret: bool}>
+ */
+function ciComposerTestProcesses(): array
+{
+    $composer = json_decode((string) file_get_contents(\dirname(__DIR__, 2).'/composer.json'), true);
+    $scripts = \is_array($composer) && \is_array($composer['scripts'] ?? null) ? $composer['scripts'] : [];
+
+    if (! isset($scripts['test'])) {
+        throw new RuntimeException('composer.json has no "test" script.');
+    }
+
+    $env = [];
+    $processes = [];
+
+    $walk = static function (string $name) use (&$walk, &$env, &$processes, $scripts): void {
+        $entries = $scripts[$name] ?? null;
+        $entries = \is_string($entries) ? [$entries] : $entries;
+
+        if (! \is_array($entries)) {
+            throw new RuntimeException("composer.json has no \"{$name}\" script.");
+        }
+
+        foreach ($entries as $entry) {
+            \assert(\is_string($entry));
+
+            if (str_starts_with($entry, '@putenv ')) {
+                [$key, $value] = explode('=', substr($entry, \strlen('@putenv ')), 2);
+                $env[$key] = $value;
+            } elseif (str_starts_with($entry, '@php ')) {
+                $parts = explode(' ', substr($entry, \strlen('@php ')));
+                $processes[] = ['pest' => array_shift($parts), 'args' => implode(' ', $parts)] + ciSuiteSettings($env);
+            } elseif ($entry === 'pest') {
+                $processes[] = ['pest' => 'vendor/bin/pest', 'args' => ''] + ciSuiteSettings($env);
+            } elseif (str_starts_with($entry, '@')) {
+                $walk(substr($entry, 1));
+            } else {
+                throw new RuntimeException("composer.json's test chain runs \"{$entry}\", which this walk does not model.");
+            }
+        }
+    };
+
+    $walk('test');
+
+    return $processes;
+}
+
+/**
+ * The two settings a suite process reads from its environment as constants.
+ *
+ * @param  array<string, string>  $env
+ * @return array{single_site: bool, secret: bool}
+ */
+function ciSuiteSettings(array $env): array
+{
+    return [
+        // As tests/Integration/wp-tests-config.php reads them.
+        'single_site' => ($env['UAMSWP_MIGRATION_API_TESTS_SINGLE_SITE'] ?? '') === '1',
+        'secret' => ($env['WP_TESTS_MIGRATION_SECRET'] ?? '') !== '',
+    ];
+}
+
+/**
+ * The Pest processes the local `pest` job starts, from scripts/pest-suites.php.
+ *
+ * @return list<array{pest: string, args: string, single_site: bool, secret: bool}>
+ */
+function ciRunnerProcesses(): array
+{
+    $suites = require \dirname(__DIR__, 2).'/scripts/pest-suites.php';
+    \assert(\is_array($suites));
+
+    $processes = [];
+
+    foreach ($suites as $suite) {
+        \assert(\is_array($suite) && \is_string($suite['pest'] ?? null) && \is_array($suite['args'] ?? null) && \is_array($suite['env'] ?? null));
+
+        $args = [];
+        $env = [];
+
+        foreach ($suite['args'] as $arg) {
+            \assert(\is_string($arg));
+            $args[] = $arg;
+        }
+
+        foreach ($suite['env'] as $key => $value) {
+            \assert(\is_string($key) && \is_string($value));
+            $env[$key] = $value;
+        }
+
+        $processes[] = ['pest' => $suite['pest'], 'args' => implode(' ', $args)] + ciSuiteSettings($env);
+    }
+
+    return $processes;
+}
+
 it('gates every workflow job on the RUN_REMOTE_CI kill-switch', function (): void {
     // The switch is the whole budget story: Actions minutes bill at the
     // organization level, and a single job missing the gate keeps billing after
@@ -381,4 +487,42 @@ it('checks shipped calls against the PHP 8.2 floor on both sides', function (): 
         ->and(\is_array($guard) ? ($guard['run'] ?? null) : null)->toBe('php scripts/check-floor-functions.php')
         ->and($workflow)->toContain("php-version: '8.2'")
         ->and($workflow)->toContain('php scripts/check-floor-functions.php');
+});
+
+it('starts the same Pest processes from `composer test` and the local runner', function (): void {
+    // ci.yml's pest job runs `composer test`; local-ci.json's runs
+    // scripts/run-pest-suites.php, which starts what scripts/pest-suites.php
+    // lists. Neither side can drop, add or reorder a process without the
+    // other (#14).
+    $local = null;
+
+    foreach (ciLocalConfig()['jobs'] as $job) {
+        if ($job['name'] === 'pest') {
+            $local = $job;
+        }
+    }
+
+    expect(ciWorkflowJobs()['pest'] ?? '')->toContain('run: composer test')
+        ->and(\is_array($local) ? ($local['run'] ?? null) : null)->toBe('php scripts/run-pest-suites.php')
+        ->and(ciComposerTestProcesses())->toBe(ciRunnerProcesses());
+});
+
+it('runs the Integration suite on both install shapes, each with and without the secret', function (): void {
+    // The comparison above passes on two lists that agree and are both
+    // wrong. This names what the list has to contain.
+    $integration = [];
+
+    foreach (ciRunnerProcesses() as $process) {
+        if ($process['pest'] === 'tests/Integration/vendor/bin/pest') {
+            $full = ! str_contains($process['args'], 'SharedSecretTest.php');
+            $integration[] = [$process['single_site'], $process['secret'], $full];
+        }
+    }
+
+    expect($integration)->toBe([
+        [false, false, true],
+        [false, true, false],
+        [true, false, true],
+        [true, true, false],
+    ]);
 });

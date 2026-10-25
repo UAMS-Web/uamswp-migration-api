@@ -53,11 +53,24 @@
         "test": [
             "@test:unit",
             "@test:integration",
-            "@test:integration:secret"
+            "@test:integration:secret",
+            "@test:integration:single-site",
+            "@test:integration:single-site:secret"
         ],
         "test:unit": "pest",
         "test:integration": "@php tests/Integration/vendor/bin/pest --configuration=tests/Integration/phpunit.xml --test-directory=.",
         "test:integration:secret": [
+            "@putenv UAMSWP_MIGRATION_API_TESTS_SINGLE_SITE=",
+            "@putenv WP_TESTS_MIGRATION_SECRET=shared-secret-for-tests",
+            "@php tests/Integration/vendor/bin/pest --configuration=tests/Integration/phpunit.xml --test-directory=. tests/Integration/Feature/SharedSecretTest.php"
+        ],
+        "test:integration:single-site": [
+            "@putenv WP_TESTS_MIGRATION_SECRET=",
+            "@putenv UAMSWP_MIGRATION_API_TESTS_SINGLE_SITE=1",
+            "@php tests/Integration/vendor/bin/pest --configuration=tests/Integration/phpunit.xml --test-directory=."
+        ],
+        "test:integration:single-site:secret": [
+            "@putenv UAMSWP_MIGRATION_API_TESTS_SINGLE_SITE=1",
             "@putenv WP_TESTS_MIGRATION_SECRET=shared-secret-for-tests",
             "@php tests/Integration/vendor/bin/pest --configuration=tests/Integration/phpunit.xml --test-directory=. tests/Integration/Feature/SharedSecretTest.php"
         ],
@@ -86,6 +99,8 @@
         "test:unit": "Run the Pest 5 suite that needs no WordPress and no database.",
         "test:integration": "Run the suite that boots WordPress through wp-phpunit, from tests/Integration's own Composer setup.",
         "test:integration:secret": "Re-run the shared-secret tests in a process where UAMSWP_MIGRATION_API_SECRET is defined. A constant cannot be undefined, so its two states need two processes.",
+        "test:integration:single-site": "Run the suite that boots WordPress again on a single-site install. MULTISITE is a constant fixed for the process, so each install shape needs its own process.",
+        "test:integration:single-site:secret": "Re-run the shared-secret tests on a single-site install, with UAMSWP_MIGRATION_API_SECRET defined.",
         "mutate": "Mutate, from the Integration setup, the three classes mutation can actually reach and require the suite to kill each mutant. Needs a coverage driver; takes minutes. See docs/DECISIONS.md D-023.",
         "stan": "Run PHPStan at level max.",
         "refactor": "Apply the gating Rector profile.",
