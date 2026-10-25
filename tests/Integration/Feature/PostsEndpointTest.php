@@ -368,6 +368,21 @@ it('stamps a total that describes the filtered set, not the whole type', functio
         ->and(headers($response)['X-WP-TotalPages'])->toBe('2');
 });
 
+it('answers a filter that matches nothing with an empty page and a zero total', function (): void {
+    // Both queries come back empty here: the page's and the second one that
+    // `countMatching()` runs for the total. The stubs type `WP_Query::$posts`
+    // nullable from 7.x on, and an empty result has to reach the response as
+    // an empty page and `0`, not a 500 from iterating or counting a null.
+    makePost();
+
+    $response = postsGet('/posts/post', ['modified_after' => '2999-01-01 00:00:00']);
+
+    expect($response->get_status())->toBe(200)
+        ->and($response->get_data())->toBe([])
+        ->and(headers($response)['X-WP-Total'])->toBe('0')
+        ->and(headers($response)['X-WP-TotalPages'])->toBe('0');
+});
+
 it('serves never-published records on every `modified_after` pull', function (): void {
     /*
      * WordPress writes `0000-00-00 00:00:00` into the GMT columns of a post

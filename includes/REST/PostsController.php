@@ -92,11 +92,16 @@ final class PostsController extends Controller
 
         $query = new WP_Query($args);
 
-        self::primeParents($query->posts);
+        // `$posts` is null until a query runs, and the stubs type it nullable
+        // from 7.x on. An empty page is an empty page either way, so `?:` maps
+        // both to `[]` rather than casting the null away.
+        $posts = $query->posts ?: [];
+
+        self::primeParents($posts);
 
         $records = [];
 
-        foreach ($query->posts as $post) {
+        foreach ($posts as $post) {
             if ($post instanceof WP_Post) {
                 $records[] = PostPayload::build($post);
             }
@@ -509,7 +514,8 @@ final class PostsController extends Controller
             ]
         ));
 
-        return \count($count->posts);
+        // Null and empty both mean no matches, for the reason the listing gives.
+        return \count($count->posts ?: []);
     }
 
     /**

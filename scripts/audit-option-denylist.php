@@ -126,8 +126,7 @@ function auditSite(int $blogId): void
         return;
     }
 
-    $rows = $wpdb->get_results("SELECT option_name, option_value FROM {$wpdb->options}", ARRAY_A);
-    $rows = \is_array($rows) ? $rows : [];
+    $rows = $wpdb->get_results("SELECT option_name, option_value FROM {$wpdb->options}", ARRAY_A) ?: [];
 
     $patterns = Config::optionDenylist();
 

@@ -290,11 +290,11 @@ final class DiscoveryPayload
         $grouped = $wpdb->get_results(
             "SELECT post_type, COUNT(*) AS total FROM {$wpdb->posts} WHERE post_status != 'auto-draft' GROUP BY post_type",
             ARRAY_A
-        );
+        ) ?: [];
 
         $byPostType = [];
 
-        foreach (\is_array($grouped) ? $grouped : [] as $row) {
+        foreach ($grouped as $row) {
             $type = $row['post_type'] ?? null;
             $total = $row['total'] ?? null;
 
