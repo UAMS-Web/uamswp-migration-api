@@ -62,6 +62,7 @@ permissions:
 #   synced-files -> "Check the synced files against the manifest"
 #   handed-back-workflow -> "Check the handed-back workflow against its template"
 #   download-archive -> "Check what the GitHub download holds"
+#   aggregate-needs -> "Check every job is in the CI job's needs"
 #   spell      -> "Run cspell"
 #   pint       -> "Determine changed PHP files" + "Run Pint on changed files"
 #   rector     -> "Run Rector (gating profile, dry-run)"
@@ -72,7 +73,7 @@ permissions:
 # JOB CHAIN (cost-ordered): the jobs run as a strict sequential chain via
 # `needs:`, shortest -> longest:
 #
-#   load-guard -> lint-floor -> validate -> floor-functions -> glyph -> synced-files -> handed-back-workflow -> download-archive -> spell -> pint -> rector -> phpstan -> pest -> node-test
+#   load-guard -> lint-floor -> validate -> floor-functions -> glyph -> synced-files -> handed-back-workflow -> download-archive -> aggregate-needs -> spell -> pint -> rector -> phpstan -> pest -> node-test
 #
 # node-test runs LAST despite needing neither Composer nor npm, matching where
 # wordpress-importer's reference implementation places it, ported rather than
@@ -98,7 +99,7 @@ permissions:
 #
 # `synced-files`, `handed-back-workflow` and `download-archive` were local-only
 # until #10. The local chain stopped gating a merge with D-105, so each now runs
-# here too, where `CI` requires it.
+# here too, where `CI` requires it. `aggregate-needs` joined both sides with #10.
 #
 # The runner also validates the remote head in a detached slot, hands the run to
 # the branch's own copy of itself when the two differ, refuses untracked
@@ -347,11 +348,35 @@ jobs:
       - name: Check what the GitHub download holds
         run: node .claude/skills/download-archive-check/check-download-archive.mjs
 
-  spell:
-    name: Spell check (cspell)
+  aggregate-needs:
+    name: Aggregate needs (every job is in CI's needs)
     runs-on: ubuntu-latest
     # CI chain: runs only after the download-archive check passes.
     needs: download-archive
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    # Fails, naming the job, when a job in a pull_request workflow is missing
+    # from the `needs:` list of the `CI` job below, so nothing requires it, or
+    # when one of the three names the ruleset requires is reported by no job
+    # (D-105). Allow-list: `.github/aggregate-needs-allow.json`, absent here.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # No `npm ci`: every import in the script resolves to a node: builtin.
+      # PARITY: mirrored by the aggregate-needs job in local-ci.json.
+      - name: Check every job is in the CI job's needs
+        run: node .claude/skills/code-quality/scripts/check-aggregate-needs.mjs
+
+  spell:
+    name: Spell check (cspell)
+    runs-on: ubuntu-latest
+    # CI chain: runs only after the aggregate-needs check passes.
+    needs: aggregate-needs
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
     if: vars.RUN_REMOTE_CI != 'false'
     # A blocking gate, not advisory. The dictionary is clean, and cspell was
@@ -685,6 +710,7 @@ jobs:
       - synced-files
       - handed-back-workflow
       - download-archive
+      - aggregate-needs
       - spell
       - pint
       - rector
