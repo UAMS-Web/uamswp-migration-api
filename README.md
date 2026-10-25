@@ -142,7 +142,7 @@ That runs the shared local CI runner over [`local-ci.json`](local-ci.json): the 
 
 `composer ci` is a **subset**: three of the checks, run in place. Use it while iterating; use the chain before opening a pull request.
 
-Remote runs are gated on an organization-level `RUN_REMOTE_CI` Actions variable, because minutes bill across every `UAMS-Web` repository. When it is `false` every job reports `skipped` and the local runner is the only gate. `.github/workflows/ci.yml` and `local-ci.json` are hand-maintained mirrors: a pre-commit hook and `tests/Unit/CiParityTest.php` keep them in step.
+The same jobs run on GitHub Actions on every pull request, and `main` requires three checks: `CI`, which fails unless every job in `ci.yml` succeeded, `Attribution footer` and `Closing keywords`. The local chain is for validating a branch before it is pushed; it does not gate a merge. `.github/workflows/ci.yml` and `local-ci.json` are hand-maintained mirrors: a pre-commit hook and `tests/Unit/CiParityTest.php` keep them in step.
 
 ## Temporary by design
 
