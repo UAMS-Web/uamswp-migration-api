@@ -586,6 +586,7 @@ Entries are append-only in spirit: superseding one means adding a new entry that
 - **What would change this** — if the Feature suite ever stopped booting the surrounding install (a fixed WordPress vendored for CI, say), the backstop disappears and the analyzer becomes the only detector, exactly as it is for PHP. At that point pin the stubs to whatever production runs and carry the ignores.
 - **Verified, not assumed** — the constraint was changed, `composer update` run, the resulting errors read individually, and the change reverted. `composer.json` and `composer.lock` are untouched by this decision; the only artifact is this entry.
 - **Ref** — D-013, D-015, D-027
+- **Superseded by D-106**: the stubs are pinned `~6.8.0`. The local install the suite boots runs WordPress 7.0.7, past production, so the local half of the backstop is gone.
 
 ### D-052 — `modified_after` widens in every direction it was narrow, and never-published records are always served
 
@@ -1344,3 +1345,13 @@ Entries are append-only in spirit: superseding one means adding a new entry that
 - **Rejected**: leaving `main` with no required check, which was the first answer on #7 and was replaced by matching the add-ons; requiring the chained jobs by name, which a renamed job silently drops and a gated job passes while skipped (D-101); removing the `RUN_REMOTE_CI` gate, which changes every job for no gain once `CI` fails closed; and running the local chain before every merge.
 - **Supersedes**: the "no status check" part of D-090, and the parts of D-029 and D-101 that describe the kill-switch as reaching this repository.
 - **Ref**: #7, #8, D-029, D-090, D-101, `UAMS-Web/uams-claude-skills#169`, `UAMS-Web/uams-claude-skills#291`
+
+### D-106: PHPStan analyzes against the WordPress 6.8 stubs that match production
+
+- **Decided**: on 2026-10-25 by the project owner, for #6. `php-stubs/wordpress-stubs` is constrained `~6.8.0`, which resolves to v6.8.3, the newest 6.8 stub release; no stub release tracks WordPress patch versions, so there is none for 6.8.7. Dependabot holds its minor and major updates, as it does for `wp-phpunit/wp-phpunit`.
+- **Why**: D-051 accepted stubs ahead of production because the suite booted a 6.8 install. The local install it boots now runs WordPress 7.0.7, so locally a call to an API newer than 6.8 passes both PHPStan and the suite. The remote `pest` job still runs WordPress 6.8.9 (wp-phpunit's pin) and gates every merge through `CI` (D-105), but it only catches a call a test executes. The 6.8 stubs catch one on any path.
+- **Measured**: the stub files read at tags `v6.8.3`, `v6.9.4` and `v7.1.2`. They declare 60 and 250 function and method names respectively that 6.8.3 does not. Of the 61 WordPress functions and the `wpdb` and `WP_Query` methods the shipped code calls, none is missing from 6.8.3 and no PHP signature differs from 7.1.2; 22 differ in PHPDoc types only. Where 7.1.2 narrows a type, WordPress 6.8.7's source agrees: `wpdb::get_var()` returns `null` for an empty value (`class-wpdb.php` at `6.8.7`), and `wp_get_attachment_metadata()` keeps `false`.
+- **Cost**: the 6.8.3 stubs tag `get_terms()` and `wp_count_terms()` `@internal` by mistake, which `phpstan.neon.dist` ignores by message for those two functions only, and type `maybe_serialize()` as `mixed`, which `OptionClassifierTest` narrows with an `assert()`. That is six errors, five of them `function.internal`. D-051's `WP_REST_Request` error no longer occurs.
+- **Rejected**: the 7.1.2 bump #6 proposed, which accepts 250 names production lacks. Keeping `^6.8`, which resolves to 6.9.4 and accepts 60.
+- **Supersedes**: D-051.
+- **Ref**: #6, #5, #2, D-051, D-105

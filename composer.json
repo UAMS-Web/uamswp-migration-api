@@ -10,7 +10,7 @@
         "laravel/pint": "^1.13",
         "mockery/mockery": "^1.6",
         "pestphp/pest": "^5.3",
-        "php-stubs/wordpress-stubs": "^6.8",
+        "php-stubs/wordpress-stubs": "~6.8.0",
         "phpstan/phpstan": "^2.1",
         "phpstan/phpstan-mockery": "^2.0",
         "rector/rector": "^2.5",
