@@ -16,6 +16,7 @@
 
 declare(strict_types=1);
 
+use PHPUnit\Framework\Assert;
 use UAMSWP\MigrationAPI\Tests\Support\WordPressTestCase;
 
 /**
@@ -232,10 +233,39 @@ function makeTerm(array $args = []): int
 }
 
 /**
- * Create an additional site in the network.
+ * The skip message for a test that needs a network.
+ *
+ * The suite runs once as a network and once as a single site (#14), and
+ * `MULTISITE` is fixed for the process, so a test that only means something on
+ * one shape skips on the other with this as its reason. The skip cannot hide a
+ * run that never happened: `InstallShapeGuardTest.php` reds a process whose
+ * install shape is not the one it was started for.
+ */
+function networkOnly(string $why): string
+{
+    return "Needs a network: {$why}. This process runs as a single site.";
+}
+
+/**
+ * The skip message for a test that needs a single site.
+ */
+function singleSiteOnly(string $why): string
+{
+    return "Needs a single site: {$why}. This process runs as a network.";
+}
+
+/**
+ * Create an additional site in the network, or skip on a single site.
+ *
+ * A single site has no second site to create, so every test that builds one
+ * is a network test, and the skip lives here rather than on each of them.
  */
 function makeSite(): int
 {
+    if (! is_multisite()) {
+        Assert::markTestSkipped(networkOnly('it creates a second site'));
+    }
+
     $id = WordPressTestCase::factory()->blog->create();
 
     assert(is_int($id), 'the blog factory returned something other than a blog id');

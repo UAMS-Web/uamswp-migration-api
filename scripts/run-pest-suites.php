@@ -3,16 +3,21 @@
 declare(strict_types=1);
 
 /*
- * The `pest` job in local-ci.json: the three Pest processes `composer test`
+ * The `pest` job in local-ci.json: the five Pest processes `composer test`
  * chains, against the runner's own database (#366). The unit suite runs from
  * the root setup on Pest 5; the Integration suite runs from the setup in
  * `tests/Integration` on Pest 3, because WordPress' test bootstrap cannot
  * install beside PHPUnit 13 (#375).
  *
- * Three processes rather than one because the shared secret is a CONSTANT, and a
- * constant cannot be undefined once set: the branch where no secret is
- * configured and the branch where one is each need a process of their own. The
- * third process is the one with the secret.
+ * Five processes rather than one because two settings are CONSTANTS, and a
+ * constant cannot be undefined once set. The shared secret: the branch where no
+ * secret is configured and the branch where one is each need a process of their
+ * own. And `MULTISITE`: the Integration suite runs once as a network and once as
+ * a single site (#14). So the Integration suite runs four times, each install
+ * shape with and without the secret, and every process names both settings
+ * rather than inheriting whatever the caller's shell exported. The list is
+ * scripts/pest-suites.php, which tests/Unit/CiParityTest.php holds against
+ * `composer test`.
  *
  * The runner gives this job its database through `WP_TESTS_DB_NAME`, takes the
  * suite's lock for it, and says so in `LOCAL_CI_SUITE_LOCK_HELD`; every process
@@ -89,17 +94,13 @@ if (mysqli_query($link, "CREATE DATABASE IF NOT EXISTS {$quoted} DEFAULT CHARACT
 
 mysqli_close($link);
 
-$integration = ['--configuration=tests/Integration/phpunit.xml', '--test-directory=.'];
-$suites = [
-    'Unit' => [$root.'/vendor/bin/pest', [], []],
-    'Integration' => [$root.'/tests/Integration/vendor/bin/pest', $integration, []],
-    'shared secret (second process)' => [$root.'/tests/Integration/vendor/bin/pest', [...$integration, 'tests/Integration/Feature/SharedSecretTest.php'], ['WP_TESTS_MIGRATION_SECRET' => 'shared-secret-for-tests']],
-];
+/** @var array<string, array{pest: string, args: list<string>, env: array<string, string>}> $suites */
+$suites = require __DIR__.'/pest-suites.php';
 
-foreach ($suites as $label => [$pest, $args, $env]) {
+foreach ($suites as $label => ['pest' => $pest, 'args' => $args, 'env' => $env]) {
     echo "==> pest: {$label}\n";
 
-    $command = array_merge([PHP_BINARY, $pest], $args);
+    $command = array_merge([PHP_BINARY, $root.'/'.$pest], $args);
     $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, $root, array_merge(getenv(), ['WP_TESTS_ABSPATH' => $wordpress], $env));
 
     if (! is_resource($process)) {

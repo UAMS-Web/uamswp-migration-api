@@ -32,12 +32,19 @@ define('DB_COLLATE', '');
 $table_prefix = 'wptests_';
 
 /*
+ * A network by default, and a single site when
+ * UAMSWP_MIGRATION_API_TESTS_SINGLE_SITE is set (#14).
+ *
  * Every endpoint in this plugin is site-scoped, and Site::switchForRequest() is
- * switch_to_blog() and its restore. On a single-site install that branch never
- * executes, so a green suite would say nothing about the code path that matters
- * most. Not a preference — the suite has to run against a network.
+ * switch_to_blog() and its restore, which only a network executes; so the
+ * default run is a network. The plugin also runs on single-site installs, where
+ * the token lives in `wp_options` rather than `wp_sitemeta` and the settings
+ * page sits under Settings, so scripts/run-pest-suites.php runs the suite a
+ * second time as a single site. Defining the constant false is enough: the
+ * wp-phpunit bootstrap reads it, and the `WP_MULTISITE` environment variable it
+ * also reads is never set here.
  */
-define('WP_TESTS_MULTISITE', true);
+define('WP_TESTS_MULTISITE', getenv('UAMSWP_MIGRATION_API_TESTS_SINGLE_SITE') !== '1');
 
 define('WP_TESTS_DOMAIN', 'example.org');
 define('WP_TESTS_EMAIL', 'admin@example.org');

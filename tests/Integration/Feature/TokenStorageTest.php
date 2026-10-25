@@ -13,19 +13,19 @@ use UAMSWP\MigrationAPI\Token;
  * `tests/Unit/TokenTest.php` and runs without WordPress. What needs WordPress is
  * everything about WHERE the record lands and what the API does with it.
  *
- * **This suite runs as multisite, so it cannot take the single-site branch.**
+ * **The suite runs once as a network and once as a single site (#14).**
  * `is_multisite()` reads the `MULTISITE` constant, which is fixed for the
- * process. Two of the properties #141 asks about are therefore proved here in
- * the strongest form this install allows, and the residue is named rather than
- * ticked:
+ * process, so each install shape has its own process. This file runs in both;
+ * the one test that only a network can satisfy skips on a single site.
  *
  * - *stored hashed on both branches* — the write path is one code path with no
  *   `is_multisite()` branch in it, and the test below asserts the plaintext
- *   appears nowhere in what was stored. What is deferred is inspecting storage
- *   on a genuinely single-site install.
- * - *`GET /options` does not serve it* — asserted by putting the option where
- *   the single-site branch would put it (`wp_options`) and dispatching the real
- *   endpoint, rather than by reading the denylist and agreeing with it.
+ *   appears nowhere in what was stored. `SingleSiteTest.php` reads the record
+ *   back out of `wp_options` on a single-site install.
+ * - *`GET /options` does not serve it* — asserted here by putting a record in
+ *   `wp_options` and dispatching the real endpoint, rather than by reading the
+ *   denylist and agreeing with it. `SingleSiteTest.php` asserts the same of a
+ *   token issued for real on a single site, where `wp_options` is where it lands.
  */
 
 /**
@@ -144,9 +144,8 @@ it('refuses a regenerated-away token once its window has closed', function (): v
 it('withholds the option by NAME, even carrying a value that looks harmless', function (): void {
     // `update_network_option()` falls through to `update_option()` when
     // `! is_multisite()`, so on a single-site install this record lands in
-    // `wp_options` — the table this endpoint serves. This install is multisite,
-    // so the value is placed there directly to put the endpoint in front of the
-    // shape it would actually meet.
+    // `wp_options` — the table this endpoint serves. The value is placed there
+    // directly so the test reads the same on both install shapes.
     //
     // **The value here is deliberately not secret-shaped.** A real record holds
     // a 64-character SHA-256 hash, which `OptionsPayload`'s shape heuristic
@@ -187,4 +186,4 @@ it('keeps the record out of wp_options on the multisite branch', function (): vo
 
     expect(get_option(Token::OPTION, null))->toBeNull();
     expect(get_network_option(null, Token::OPTION, null))->toBeArray();
-});
+})->skip(! is_multisite(), networkOnly('only a network stores the record outside wp_options'));

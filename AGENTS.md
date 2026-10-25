@@ -49,7 +49,7 @@ Pre-commit guard: if `.githooks/pre-commit` exists, run `git config core.hooksPa
 
 - **WordPress plugin**, standalone. No application framework — no service container, no ORM, no framework test helpers.
 - **PHP 8.2 is the supported floor** (production runs 8.2.30); development and the test suites run on **PHP 8.4** (D-092). **WordPress 6.8.7** in production.
-- Runs inside a **multisite network**. Every endpoint is site-scoped.
+- Runs on a **multisite network** or a **single-site install** (`news.uams.edu` is one). Every endpoint is site-scoped; on a single site `?site=` is refused with a `400`, and the token is stored in `wp_options`, the table `GET /options` serves (#14).
 - Consumer is [`UAMS-Web/wordpress-importer`](https://github.com/UAMS-Web/wordpress-importer). Epic: [`wordpress-importer#358`](https://github.com/UAMS-Web/wordpress-importer/issues/358).
 - Local development runs under Herd at `uamshealthmu.test`, with the plugin checked out into `wp-content/plugins/`.
 
@@ -87,7 +87,8 @@ local-ci.json              The local mirror of ci.yml, run by the shared local C
 scripts/
   ci-local.mjs             `npm run ci:local`: the shared runner, with a dotted slot
   prepare-dependencies.mjs Installs in the runner's slot; refuses a stale tree elsewhere
-  run-pest-suites.php      Creates the test database, runs the three Pest processes
+  run-pest-suites.php      Creates the test database, runs the five Pest processes
+  pest-suites.php          The five processes, held against `composer test` by CiParityTest
   check-no-vendor-dependency.php  Load guard: no Composer artifact at runtime
   check-floor-functions.php  Floor guard: no shipped call PHP 8.2 lacks behind a polyfill
   setup-git-hooks.php      Points core.hooksPath at .githooks
@@ -147,9 +148,10 @@ npm run ci:local -- --branch <b>   # the full CI chain, in a worktree
 composer ci              # phpstan, pint --test, pest — a SUBSET, see below
 composer stan            # PHPStan at level max
 composer setup:integration  # install tests/Integration's own setup, once per tree
-composer test            # all three test processes
+composer test            # all five test processes
 composer test:unit       # the suite that runs with no WordPress
-composer test:integration    # the suite that boots WordPress
+composer test:integration    # the suite that boots WordPress, as a network
+composer test:integration:single-site  # the same suite, as a single site
 composer mutate          # mutation testing over the pure-logic classes
 vendor/bin/pint          # format
 composer test:refactor   # Rector preview (gating profile)
@@ -190,7 +192,7 @@ Decisions that outlive their ticket are recorded in [`docs/DECISIONS.md`](docs/D
 
 ## Running it locally
 
-This is a WordPress plugin, so it needs a WordPress multisite to run in. If you do not already have one, the team's [`wp-to-herd`](https://github.com/UAMS-Web/uams-claude-skills/tree/main/wp-to-herd) skill stands one up in Laravel Herd on Windows or macOS, from either a Local by Flywheel directory or a production backup, and covers the multisite case specifically. It lives in [`UAMS-Web/uams-claude-skills`](https://github.com/UAMS-Web/uams-claude-skills), installed opt-in through that repo's `install.sh`.
+This is a WordPress plugin, so it needs a WordPress install to run in, and the verification scripts below need a multisite one. If you do not already have one, the team's [`wp-to-herd`](https://github.com/UAMS-Web/uams-claude-skills/tree/main/wp-to-herd) skill stands one up in Laravel Herd on Windows or macOS, from either a Local by Flywheel directory or a production backup, and covers the multisite case specifically. It lives in [`UAMS-Web/uams-claude-skills`](https://github.com/UAMS-Web/uams-claude-skills), installed opt-in through that repo's `install.sh`.
 
 The development network that `scripts/verify-site-scoping.php` and `scripts/verify-taxonomy-coverage.php` expect is that install; both are listed in [`docs/known-gaps.md`](docs/known-gaps.md) as verifications that cannot run on CI.
 

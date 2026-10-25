@@ -815,7 +815,7 @@ it('serves a network-activated plugin under the network scope', function (): voi
             'header' => ['Name' => 'Versioned Fixture', 'Version' => '1.6.6', 'TextDomain' => 'versioned-fixture'],
         ],
     ]);
-});
+})->skip(! is_multisite(), networkOnly('only a network activates a plugin network-wide'));
 
 it('serves per-site plugins before network ones, and a plugin active in both under each', function (): void {
     $versioned = fixturePlugin('versioned/versioned.php');
@@ -829,7 +829,7 @@ it('serves per-site plugins before network ones, and a plugin active in both und
         [$undeclared, 'site'],
         [$versioned, 'network'],
     ]);
-});
+})->skip(! is_multisite(), networkOnly('only a network activates a plugin network-wide'));
 
 it('serves an active plugin whose file is missing with a null header, not dropped', function (): void {
     // Active in the database and absent on disk is the disagreement a consumer
@@ -925,7 +925,7 @@ it('serves the stored network plugins, not what a filter on the network option a
     } finally {
         remove_filter('site_option_active_sitewide_plugins', $inject);
     }
-});
+})->skip(! is_multisite(), networkOnly('only a network activates a plugin network-wide'));
 
 it('reads the active plugins of the site being read, not the one answering', function (): void {
     // Per-site activation lives in each site's own `active_plugins`, so the

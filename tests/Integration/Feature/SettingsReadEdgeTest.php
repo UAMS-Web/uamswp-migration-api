@@ -146,7 +146,7 @@ describe('OptionsPayload', function (): void {
 
         expect(settingsWithDatabase(null, static fn (): mixed => settingsCall(OptionsPayload::class, 'rows')))->toBe([])
             ->and(settingsWithDatabase(null, static fn (): mixed => settingsCall(OptionsPayload::class, 'storedNetworkOption', 'site_name')))->toBeNull();
-    });
+    })->skip(! is_multisite(), networkOnly('a single site has no network option to read'));
 
     it('reads no options table when the handle answers the read with something other than rows', function (): void {
         // Core's `get_results()` always returns an array for `ARRAY_A`, but a
