@@ -335,7 +335,7 @@ it('drops a form whose definition has gone, from the records and the total alike
      * takes a literal-string query, and building one by concatenation is the
      * shape that hides an injection even when — as here — the value is
      * trusted. The identifier placeholder has been available since WordPress
-     * 6.2, and production is on 6.8.7.
+     * 6.2, and the WordPress floor is 6.8.11.
      */
     $sql = $wpdb->prepare(
         'DELETE FROM %i WHERE form_id = %d',

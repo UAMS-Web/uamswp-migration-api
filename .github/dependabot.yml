@@ -32,13 +32,13 @@ updates:
     ignore:
       # D-030: the free fallback is pinned to ACF PRO's minor (~6.4.0); moving it is its own ticket.
       - dependency-name: wpackagist-plugin/advanced-custom-fields
-      # Tracks production WordPress 6.8.7, so majors and minors are held; patch updates within 6.8
+      # Tracks the WordPress floor, 6.8.11 (#13), so majors and minors are held; patch updates within 6.8
       # still run. Dependabot moves a ~6.8.0 constraint to the next minor (#430, #431).
       - dependency-name: wp-phpunit/wp-phpunit
         update-types:
           - version-update:semver-major
           - version-update:semver-minor
-      # D-106: the stubs PHPStan reads are pinned to production's WordPress minor (~6.8.0), held
+      # D-106: the stubs PHPStan reads are pinned to the WordPress floor's minor (~6.8.0), held
       # for the reason given above.
       - dependency-name: php-stubs/wordpress-stubs
         update-types:
@@ -66,7 +66,7 @@ updates:
       - dependency-name: wpackagist-plugin/pretty-link
       # D-089, as above.
       - dependency-name: wpackagist-plugin/redirection
-      # Tracks production WordPress 6.8.7, so majors and minors are held; patch updates within 6.8
+      # Tracks the WordPress floor, 6.8.11 (#13), so majors and minors are held; patch updates within 6.8
       # still run. Dependabot moves a ~6.8.0 constraint to the next minor (#430, #431).
       - dependency-name: wp-phpunit/wp-phpunit
         update-types:

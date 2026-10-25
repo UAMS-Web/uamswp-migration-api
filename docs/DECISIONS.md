@@ -587,6 +587,7 @@ Entries are append-only in spirit: superseding one means adding a new entry that
 - **Verified, not assumed** — the constraint was changed, `composer update` run, the resulting errors read individually, and the change reverted. `composer.json` and `composer.lock` are untouched by this decision; the only artifact is this entry.
 - **Ref** — D-013, D-015, D-027
 - **Superseded by D-106**: the stubs are pinned `~6.8.0`. The local install the suite boots runs WordPress 7.0.7, past production, so the local half of the backstop is gone.
+- **Note, 2026-10-25 (#13)**: the 6.8.7 figure in this entry is not what the target installs run. Measured that day with `wp core version` (WP-CLI 2.12.0): `uamshealth.com` runs 7.0.7, and the oldest installs the plugin targets, `idhi.uams.edu` and `news.uams.edu`, run 6.8.11, which is the floor. The entry is left as recorded.
 
 ### D-052 — `modified_after` widens in every direction it was narrow, and never-published records are always served
 
@@ -1355,3 +1356,4 @@ Entries are append-only in spirit: superseding one means adding a new entry that
 - **Rejected**: the 7.1.2 bump #6 proposed, which accepts 250 names production lacks. Keeping `^6.8`, which resolves to 6.9.4 and accepts 60.
 - **Supersedes**: D-051.
 - **Ref**: #6, #5, #2, D-051, D-105
+- **Note, 2026-10-25 (#13)**: the 6.8.7 figure in this entry is not what the target installs run. Measured that day with `wp core version` (WP-CLI 2.12.0): `uamshealth.com` runs 7.0.7, and the oldest installs the plugin targets, `idhi.uams.edu` and `news.uams.edu`, run 6.8.11, which is the floor. The pin is unchanged: `~6.8.0` is still the closest stub release to the floor, and the stubs carry no 6.8.11 release either.
