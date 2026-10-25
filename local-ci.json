@@ -70,6 +70,13 @@
       "requires": ["bin:node", "bin:git"]
     },
     {
+      "name": "aggregate-needs",
+      "_note": "Fails naming a ci.yml job missing from the CI job's needs: list, or a required check name no job reports (#10). Copied by hand from uams-claude-skills ahead of the sync that will list it.",
+      "run": "node .claude/skills/code-quality/scripts/check-aggregate-needs.mjs",
+      "always": true,
+      "requires": ["bin:node"]
+    },
+    {
       "name": "spell",
       "_note": "No node_modules requirement: the runner checks requires before any job runs, so one would skip this job in a slot the dependencies job has not yet filled. An absent tree fails instead.",
       "run": "npm run spell",
