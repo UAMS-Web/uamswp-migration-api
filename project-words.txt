@@ -94,6 +94,7 @@ gwlimitcheckboxes
 gwlimitchoices
 gwtermsofservice
 hitl
+idhi
 imagename
 innodb
 iphash

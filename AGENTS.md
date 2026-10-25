@@ -48,7 +48,7 @@ Pre-commit guard: if `.githooks/pre-commit` exists, run `git config core.hooksPa
 ## Foundational context
 
 - **WordPress plugin**, standalone. No application framework — no service container, no ORM, no framework test helpers.
-- **PHP 8.2 is the supported floor** (production runs 8.2.30); development and the test suites run on **PHP 8.4** (D-092). **WordPress 6.8.7** in production.
+- **PHP 8.2 is the supported floor** (production runs 8.2.30); development and the test suites run on **PHP 8.4** (D-092). **WordPress 6.8.11 is the floor** across the installs the plugin targets (`idhi.uams.edu` and `news.uams.edu`); `uamshealth.com` runs 7.0.7 (#13).
 - Runs on a **multisite network** or a **single-site install** (`news.uams.edu` is one). Every endpoint is site-scoped; on a single site `?site=` is refused with a `400`, and the token is stored in `wp_options`, the table `GET /options` serves (#14).
 - Consumer is [`UAMS-Web/wordpress-importer`](https://github.com/UAMS-Web/wordpress-importer). Epic: [`wordpress-importer#358`](https://github.com/UAMS-Web/wordpress-importer/issues/358).
 - Local development runs under Herd at `uamshealthmu.test`, with the plugin checked out into `wp-content/plugins/`.
