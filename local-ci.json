@@ -105,6 +105,7 @@
     },
     {
       "name": "node-test",
+      "_note": "Needs the npm tree: scripts/check-path-portability.mjs imports acorn. The dependencies job's npm ci fills it here; ci.yml's node-test job runs its own npm ci (#477). No node_modules requirement, for the reason the spell job gives.",
       "run": "node --test",
       "each": ["scripts/*.test.mjs"],
       "always": true,

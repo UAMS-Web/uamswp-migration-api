@@ -187,7 +187,10 @@ it('carries a structured ACF view keyed by options page', function (): void {
         ->and($page['keys'])->toBe(['field_options_probe_title' => 'Assembled by ACF']);
 
     acf_remove_local_field_group('group_options_probe');
-});
+})->skip(
+    acfEdition() !== 'pro',
+    'the options_page location type is ACF PRO only; this run loaded the free copy (see AcfEditionGuardTest).'
+);
 
 it("serves the requested site's options, not the current site's", function (): void {
     // Site scoping is the mechanism every endpoint inherits, and its failure is
@@ -650,7 +653,10 @@ it('does not re-serve a denied value under the ACF view', function (): void {
         ->and($options)->toHaveKey('_options_probe_api_key');
 
     acf_remove_local_field_group('group_options_secret_probe');
-});
+})->skip(
+    acfEdition() !== 'pro',
+    'the options_page location type is ACF PRO only; this run loaded the free copy (see AcfEditionGuardTest).'
+);
 
 it('reports a never-pinned denylist as stale even on a site running no plugins', function (): void {
     // The `$reviewed === []` disjunct, which the suite could not previously

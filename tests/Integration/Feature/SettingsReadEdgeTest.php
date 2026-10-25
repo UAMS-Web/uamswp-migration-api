@@ -95,7 +95,10 @@ describe('OptionsPayload', function (): void {
         expect($acf($served))->toHaveKey('uamswp-shape-page')
             ->and($acf($withheld))->not->toHaveKey('uamswp-shape-page')
             ->and($byShape($withheld))->toBe(\is_int($byShape($served)) ? $byShape($served) + 1 : null);
-    });
+    })->skip(
+        acfEdition() !== 'pro',
+        'the options_page location type is ACF PRO only; this run loaded the free copy (see AcfEditionGuardTest).'
+    );
 
     it('serves an ACF options value that is already a list, after checking every string in it', function (): void {
         acf_add_local_field_group([
@@ -118,7 +121,10 @@ describe('OptionsPayload', function (): void {
         $names = \is_array($page['names'] ?? null) ? $page['names'] : [];
 
         expect($names['settings_colors'] ?? null)->toBe(['red', 'blue']);
-    });
+    })->skip(
+        acfEdition() !== 'pro',
+        'the options_page location type is ACF PRO only; this run loaded the free copy (see AcfEditionGuardTest).'
+    );
 
     it('withholds a value nested past the inspection bound', function (): void {
         // The control: a plain string at depth 0 is not a secret.
@@ -254,7 +260,10 @@ describe('FieldReader', function (): void {
 
         expect(array_keys($read['keys']))->toBe(['field_settings_title'])
             ->and(array_column($read['identities'], 'key'))->toBe(['field_settings_title']);
-    });
+    })->skip(
+        acfEdition() !== 'pro',
+        'the options_page location type is ACF PRO only; this run loaded the free copy (see AcfEditionGuardTest).'
+    );
 
     it('leaves an array that is neither a row nor a list of rows as it was', function (): void {
         $field = ['key' => 'field_parent', 'name' => 'parent', 'sub_fields' => [['key' => 'field_child', 'name' => 'child']]];

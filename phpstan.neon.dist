@@ -96,9 +96,12 @@ parameters:
     # The Integration suite's own Composer setup (#375). Its `vendor/` is a
     # second dependency tree inside `tests/`, so without this every package in
     # it would be analyzed at `level: max` as if it were first-party test code.
+    # Optional, `(?)`, because the tree exists only after `composer
+    # setup:integration`: the CI `phpstan` job installs the root setup alone,
+    # and PHPStan refuses a missing path that is not marked optional (#477).
     excludePaths:
         analyseAndScan:
-            - tests/Integration/vendor
+            - tests/Integration/vendor (?)
         # These two files test the PATCHED v3 `pest-plugin-mutate` that only the
         # Integration setup installs. The root has the v5 plugin, which has no
         # `MutationTest::childFilter()`, and nothing outside the Integration
