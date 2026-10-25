@@ -577,13 +577,14 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '22'
+          cache: npm
 
-      # Deliberately no `npm ci` and no `cache: npm`. Every import in
-      # scripts/*.test.mjs, and every import those modules pull in
-      # transitively, resolves to a `node:` builtin or a further first-party
-      # relative module -- no bare package name anywhere in the chain, so this
-      # job needs Node and nothing else.
-      #
+      # scripts/check-path-portability.mjs and its test import `acorn`, a
+      # devDependency, so the tests need the npm tree. This job ran for the
+      # first time on the public repository and failed on that import (#477).
+      - name: Install npm dependencies
+        run: npm ci
+
       # The glob is quoted so Node expands it rather than the shell: `node --test`
       # accepts a pattern directly since v22, and an unquoted glob would resolve
       # differently between the runner's shell and a Windows spawn. A bare
