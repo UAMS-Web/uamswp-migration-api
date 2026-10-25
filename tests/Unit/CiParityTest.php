@@ -84,15 +84,6 @@ function ciLocalOnlyJobs(): array
     return [
         // Installs into the runner's reused slot; Actions installs cold every job.
         'dependencies',
-        // A hand edit to a synced file; the check needs only node, and the
-        // remote chain was never asked to carry it.
-        'synced-files',
-        // The handed-back workflow against its shared template (UAMS-Web/uams-claude-skills#57).
-        'handed-back-workflow',
-        // What the GitHub download holds under the .gitattributes keep-list
-        // (#439); the download-archive-check skill runs it locally in a
-        // private repository.
-        'download-archive',
     ];
 }
 
