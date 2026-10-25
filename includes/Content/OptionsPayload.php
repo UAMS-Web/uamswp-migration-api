@@ -470,11 +470,10 @@ final class OptionsPayload
             return [];
         }
 
-        $rows = $wpdb->get_results("SELECT option_name, option_value FROM {$wpdb->options}", ARRAY_A);
-
-        if (! \is_array($rows)) {
-            return [];
-        }
+        // The stubs before 7.x allow a null here, and 7.x does not for a
+        // non-empty query. `?:` reads either as no rows, so an empty table is
+        // reported as zero options on both.
+        $rows = $wpdb->get_results("SELECT option_name, option_value FROM {$wpdb->options}", ARRAY_A) ?: [];
 
         $options = [];
 

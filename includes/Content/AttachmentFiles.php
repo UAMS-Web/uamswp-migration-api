@@ -199,10 +199,11 @@ final class AttachmentFiles
             ],
         ]);
 
-        // `fields => ids` returns ids; the type union is WP_Query's own.
+        // `fields => ids` returns ids; the type union is WP_Query's own, and so
+        // is the null the stubs allow from 7.x on, which means no candidates.
         $candidates = array_map(
             static fn (int|WP_Post $post): int => $post instanceof WP_Post ? $post->ID : $post,
-            $query->posts
+            $query->posts ?: []
         );
 
         // One meta query for every candidate rather than one each: an `ids`
