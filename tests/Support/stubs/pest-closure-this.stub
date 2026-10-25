@@ -1,0 +1,62 @@
+<?php
+
+/**
+ * Pest's test functions, with the closure's `$this` typed as the test case.
+ *
+ * Pest 5 annotates the closure passed to `it()`, `test()`, `beforeEach()` and
+ * `afterEach()` with `@param-closure-this TestCall`, where Pest 3 used
+ * `TestCase`. At runtime both bind the closure to the test case, so
+ * `$this->markTestSkipped()` works, but under the Pest 5 annotation PHPStan
+ * reports it as an undefined method and loses the narrowing its `never`
+ * return provides. The unit suite runs on Pest 5 and the Integration suite on
+ * Pest 3, from their own setups (#375), and both are analyzed against the
+ * root's Pest 5. This restores the typing the suite was written against.
+ *
+ * A `stubFiles` entry, not `scanFiles`: these functions exist, and only their
+ * signatures are overridden. Never loaded at runtime.
+ *
+ * The empty class declarations at the end exist for PHPStan's stub
+ * validator, which checks a stub against other stubs only and would otherwise
+ * report these vendor classes as missing. A stub class overrides only the
+ * members it declares, so declaring none changes nothing about them.
+ */
+
+namespace {
+    /**
+     * @param-closure-this \PHPUnit\Framework\TestCase  $closure
+     */
+    function beforeEach(?Closure $closure = null): \Pest\PendingCalls\BeforeEachCall {}
+
+    /**
+     * @param-closure-this \PHPUnit\Framework\TestCase  $closure
+     *
+     * @return ($description is string ? \Pest\PendingCalls\TestCall : \Pest\Support\HigherOrderTapProxy|\Pest\PendingCalls\TestCall)
+     */
+    function test(?string $description = null, ?Closure $closure = null): \Pest\Support\HigherOrderTapProxy|\Pest\PendingCalls\TestCall {}
+
+    /**
+     * @param-closure-this \PHPUnit\Framework\TestCase  $closure
+     */
+    function it(string $description, ?Closure $closure = null): \Pest\PendingCalls\TestCall {}
+
+    /**
+     * @param-closure-this \PHPUnit\Framework\TestCase  $closure
+     */
+    function afterEach(?Closure $closure = null): \Pest\PendingCalls\AfterEachCall {}
+}
+
+namespace Pest\PendingCalls {
+    class TestCall {}
+
+    class BeforeEachCall {}
+
+    class AfterEachCall {}
+}
+
+namespace Pest\Support {
+    class HigherOrderTapProxy {}
+}
+
+namespace PHPUnit\Framework {
+    abstract class TestCase {}
+}

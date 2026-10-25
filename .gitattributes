@@ -1,0 +1,121 @@
+# Line-ending policy for this repository.
+#
+# Without this file, every checkout is at the mercy of the checking-out machine's
+# `core.autocrlf`. Git for Windows defaults that to `true`, so a contributor who has
+# never touched it inherits a checkout where every first-party source file is
+# rewritten from this repo's LF to CRLF — and the corruption does not announce
+# itself as a line-ending problem. Measured on `josh-home` while validating #144 and
+# #149: `pint --test` reported six fixers against code with no style violations, and
+# `tests/Unit/CiParityTest.php` failed six of seven assertions, because its
+# line-based parsing of `ci.yml` and `local-ci.mjs` was matching against a trailing
+# `\r` that should never have been there. Neither failure described the code.
+#
+# `text=auto eol=lf` moves that decision from the machine to the repository: Git
+# normalizes to LF in the object database on commit, and checks out LF everywhere
+# regardless of `core.autocrlf`. See #152 and `docs/DECISIONS.md` D-066.
+#
+# `text=auto` detects binary content and leaves it alone, so this is safe as a
+# blanket rule; the explicit entries below exist so the intent is readable rather
+# than inferred, and so a new binary type is a deliberate line rather than a
+# silent reliance on detection.
+* text=auto eol=lf
+
+# First-party source, stated explicitly. These are the files the defect was
+# measured against.
+*.php   text eol=lf
+*.mjs   text eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.xml   text eol=lf
+*.stub  text eol=lf
+*.txt   text eol=lf
+*.neon  text eol=lf
+*.dist  text eol=lf
+
+# A vendor patch is whitespace-sensitive and `patches.lock.json` pins its sha256,
+# so a checkout that rewrote its line endings would fail to apply or to verify.
+*.patch text eol=lf
+
+# File types that arrive with the shared skills sync from `uams-claude-skills`
+# (#362): `.claude/sync-manifest.jsonc` and the skill templates, the release-note
+# generator and its test, and the Cursor rule copies under `.cursor/rules/`.
+# They are synced, not edited here, but they are tracked here, so they need a
+# stated policy like any other text file. See #368.
+*.jsonc text eol=lf
+*.py    text eol=lf
+*.mdc   text eol=lf
+
+# Dotfiles carry no extension a glob can match, so they are named literally.
+.gitattributes         text eol=lf
+.gitignore             text eol=lf
+.git-blame-ignore-revs text eol=lf
+.editorconfig          text eol=lf
+
+# Binary: never normalized, never diffed as text.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+
+# The decision log is APPEND-ONLY at its tail, so two tickets resolving
+# concurrently always collide there and neither branch is wrong: git sees two
+# continuations of the same last line and cannot choose between them. The
+# resolution is always concatenation, never judgement, which is exactly what the
+# built-in `union` driver does. Four such collisions were absorbed across the
+# estate in about ninety minutes on 2026-09-14. See #246 and D-075.
+#
+# Union appends ours-then-theirs and does NOT order the result, so it can land a
+# lower D-number after a higher one. `scripts/check-decision-log-order.mjs` is
+# what catches that, and the two halves are useless apart: the driver removes the
+# conflict, the guard catches what the driver got wrong. The same seam also
+# drops the blank line between the two entries it stitches together, and the
+# guard reports that too (#260).
+#
+# WHERE THIS APPLIES: to a merge git performs locally -- the author-side sync
+# `.claude/rules/sync-pr-branch.md` requires before the gating run. GitHub's
+# merge does not run a driver out of a repository's `.gitattributes`, so a
+# decision-log branch pushed unsynced is refused on the forge exactly as if this
+# line were absent. Measured in the sibling repository on the identical pair:
+# driver present, local merge clean; line removed, conflict; GitHub, dirty.
+# See #262 and D-076. The sync is the step this line serves, not one it waives.
+#
+# And it is read from the tree of the checkout PERFORMING the merge on every modern
+# git measured (2.39.5, 2.53, 2.54; git 2.32 differs), so a branch cut before this line
+# landed conflicts once on its first sync. The exit code of a decision-log sync is
+# therefore not a signal; `scripts/check-decision-log-order.mjs` is. See #277, D-076.
+#
+# This ADDS to the `*.md text eol=lf` rule above rather than replacing it --
+# attributes accumulate, and the later, more specific line only sets what it
+# names. Verified with `git check-attr text eol merge -- docs/DECISIONS.md`.
+docs/DECISIONS.md merge=union
+
+# What a GitHub download of this plugin holds (#439). A deploy tool installs the
+# plugin from `git archive` of a tag, which carries every tracked file unless a
+# line here leaves it out; a server serving the plugin folder for every file
+# type but PHP then publishes the agent folders, docs, tests and tool config.
+# A keep-list rather than a deny-list, per the `keep-the-download-to-what-runs`
+# rule: the first two lines leave out every top-level entry, dot-entries
+# included, and each line after them puts back one path the plugin runs. A new
+# runtime path needs its line here in the same change;
+# `.claude/skills/download-archive-check/check-download-archive.mjs`, the
+# `download-archive` job in `local-ci.json`, is what notices a new non-runtime
+# one. `config/local.php` is git-ignored, so it never reaches the archive.
+/* export-ignore
+/.* export-ignore
+/uamswp-migration-api.php -export-ignore
+/includes -export-ignore
+/config -export-ignore
+
+# The license ships in the GitHub download (#378). Under the keep-list #439
+# added, which leaves out every top-level entry and puts back only what the
+# plugin runs, `LICENSE` would be left out too; GPL-2.0 section 1 asks that a
+# copy of the license go with each copy distributed. Must stay below the
+# keep-list's `/* export-ignore` above, since a later matching line wins.
+/LICENSE -export-ignore

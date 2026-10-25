@@ -1,0 +1,21 @@
+{
+    "attribution": {
+        "pr": "",
+        "sessionUrl": false
+    },
+    "permissions": {
+        "allow": [],
+        "deny": [
+            "Bash(git push --force:*)",
+            "Bash(git push -f:*)",
+            "Bash(git reset --hard:*)",
+            "Bash(git clean -f:*)",
+            "Bash(git clean -xf:*)",
+            "Bash(git clean -fd:*)",
+            "Bash(gh repo delete:*)",
+            "Bash(gh api -X DELETE:*)",
+            "Bash(gh api --method DELETE:*)",
+            "Bash(gh api -X PATCH repos/UAMS-Web/uamswp-migration-api -f private=false:*)"
+        ]
+    }
+}

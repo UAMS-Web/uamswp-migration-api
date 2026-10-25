@@ -1,0 +1,121 @@
+#!/bin/sh
+#
+# Two independent commit gates, both guarding the same thing from opposite
+# ends: that the tree the tools checked is the tree that ships.
+#
+# Each gate reports on its own and the script exits ONCE. A hook that bailed on
+# the first failure would tell you about one problem, and then — after you fixed
+# it — about the other, which is two round trips for one commit.
+#
+# --- gate 1: CI parity -------------------------------------------------------
+#
+# `.github/workflows/ci.yml` and `local-ci.json` (the shared local CI runner's
+# job list, #366) are hand-maintained mirrors of one another with NO shared
+# source of truth, so they drift silently whenever only one is edited, and the
+# drift is invisible in exactly the way that matters: each file keeps working
+# on its own. This blocks a commit that stages exactly ONE of them.
+#
+# It is a co-change gate, NOT a semantic check. It does not compare commands;
+# the two files are intentionally not alike (local-ci.json carries local-only
+# jobs a fresh Actions checkout has no counterpart for). It only insists the
+# two change together so a human reviews both. `tests/Unit/CiParityTest.php` is
+# what checks the parts that CAN be compared mechanically.
+#
+# Legitimate one-sided edits exist: a typo in a ci.yml comment, a local-only
+# job. For those:  git commit --no-verify
+#
+# Installed via `git config core.hooksPath .githooks`, wired automatically from
+# composer post-install-cmd / post-update-cmd (scripts/setup-git-hooks.php).
+
+CI_FILE=".github/workflows/ci.yml"
+SCRIPT_FILE="local-ci.json"
+
+staged=$(git diff --cached --name-only)
+
+echo "$staged" | grep -qxF "$CI_FILE"     && ci=1 || ci=0
+echo "$staged" | grep -qxF "$SCRIPT_FILE" && sc=1 || sc=0
+
+status=0
+
+if [ "$ci" -ne "$sc" ]; then
+    echo "" >&2
+    echo "CI parity gate: you staged only one of the mirrored CI files:" >&2
+    echo "    $CI_FILE" >&2
+    echo "    $SCRIPT_FILE" >&2
+    echo "" >&2
+    echo "These must change together. Update the other (follow ci.yml's 'PARITY:'" >&2
+    echo "markers), or bypass for an intentional one-sided change:" >&2
+    echo "    git commit --no-verify" >&2
+    echo "" >&2
+    status=1
+fi
+
+# --- gate 2: unstaged conflict resolution ---------------------------------------
+#
+# A merge commit records the INDEX. PHPStan, Pint and Pest all read the WORKING
+# TREE. So a file resolved on disk during a merge but never `git add`ed is
+# dropped from the commit while every check passes on the version you meant to
+# ship — the branch looks validated because, as far as the tools can see, it was.
+#
+# The conflicted files are not the risk: you stage those because git listed
+# them. The risk is a file that AUTO-MERGED cleanly and was then hand-edited —
+# the ported hunk, the reconciled import list. Nothing prompts you to stage it,
+# and `git commit` accepts the merge without it. Verified against real git: the
+# commit lands at exit 0 carrying the pre-edit content.
+#
+# A genuinely UNRESOLVED file needs no gate here — git already refuses
+# ("Committing is not possible because you have unmerged files"). This covers
+# exactly the resolved-but-unstaged case.
+#
+# Scoped to merges deliberately. Unstaged changes during an ordinary commit are
+# routine — a partial commit is a normal thing to make — and gating them would
+# make this hook something people turn off. It is only mid-merge that an
+# unstaged change IS the resolution you just made.
+
+# MERGE_HEAD is not the only marker. `git cherry-pick` and `git revert` reach
+# the same state by a different verb — a conflict, a resolution, and a commit
+# that records the index — and each sets its own head ref. Verified: a
+# cherry-pick with a hand-edited auto-merged file commits at exit 0 and drops
+# the edit, exactly as a merge does. Gating only merges would leave two of the
+# three ways to hit this open.
+in_progress=""
+
+for marker in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do
+    if git rev-parse --verify -q "$marker" >/dev/null 2>&1; then
+        in_progress="$marker"
+        break
+    fi
+done
+
+if [ -n "$in_progress" ]; then
+    # Worktree vs index, tracked files only. Untracked files are not a merge
+    # resolution and are none of this gate's business.
+    unstaged=$(git diff --name-only)
+
+    if [ -n "$unstaged" ]; then
+        case "$in_progress" in
+            CHERRY_PICK_HEAD) operation="cherry-pick" ;;
+            REVERT_HEAD)      operation="revert" ;;
+            *)                operation="merge" ;;
+        esac
+
+        echo "" >&2
+        echo "Resolution gate: this $operation has edits on disk that are not staged:" >&2
+        echo "$unstaged" | sed 's/^/    /' >&2
+        echo "" >&2
+        echo "The commit records the index, but PHPStan, Pint and Pest all read the" >&2
+        echo "working tree. Commit now and those edits are LEFT OUT of it while" >&2
+        echo "every check still passes on the version you meant to ship — the branch looks" >&2
+        echo "validated because, as far as the tools can see, it was." >&2
+        echo "" >&2
+        echo "Stage them and the commit is what you resolved:" >&2
+        echo "    git add <file>..." >&2
+        echo "" >&2
+        echo "If leaving them out is deliberate:" >&2
+        echo "    git commit --no-verify" >&2
+        echo "" >&2
+        status=1
+    fi
+fi
+
+exit $status

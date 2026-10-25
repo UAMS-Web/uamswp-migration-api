@@ -1,0 +1,104 @@
+{
+    "name": "uams-web/uamswp-migration-api",
+    "description": "Read-only migration API serving raw, current WordPress content to the Statamic importer.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": "^8.2"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.13",
+        "mockery/mockery": "^1.6",
+        "pestphp/pest": "^5.3",
+        "php-stubs/wordpress-stubs": "^6.8",
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan-mockery": "^2.0",
+        "rector/rector": "^2.5",
+        "szepeviktor/phpstan-wordpress": "^2.0",
+        "wp-phpunit/wp-phpunit": "~6.8.0",
+        "wpackagist-plugin/advanced-custom-fields": "~6.4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "UAMSWP\\MigrationAPI\\": "includes/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "UAMSWP\\MigrationAPI\\Tests\\": "tests/"
+        },
+        "exclude-from-classmap": [
+            "tests/Support/phpunit-removed-classes.php",
+            "tests/Integration/vendor/"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "platform": {
+            "php": "8.4.1"
+        },
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "composer/installers": false
+        }
+    },
+    "scripts": {
+        "post-install-cmd": [
+            "@php scripts/setup-git-hooks.php"
+        ],
+        "post-update-cmd": [
+            "@php scripts/setup-git-hooks.php"
+        ],
+        "setup:integration": "@composer install --working-dir=tests/Integration",
+        "test": [
+            "@test:unit",
+            "@test:integration",
+            "@test:integration:secret"
+        ],
+        "test:unit": "pest",
+        "test:integration": "@php tests/Integration/vendor/bin/pest --configuration=tests/Integration/phpunit.xml --test-directory=.",
+        "test:integration:secret": [
+            "@putenv WP_TESTS_MIGRATION_SECRET=shared-secret-for-tests",
+            "@php tests/Integration/vendor/bin/pest --configuration=tests/Integration/phpunit.xml --test-directory=. tests/Integration/Feature/SharedSecretTest.php"
+        ],
+        "mutate": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php tests/Integration/vendor/bin/pest --configuration=tests/Integration/phpunit.xml --test-directory=. --mutate --covered-only --path=includes/Pagination.php",
+            "@php tests/Integration/vendor/bin/pest --configuration=tests/Integration/phpunit.xml --test-directory=. --mutate --covered-only --path=includes/Config.php",
+            "@php tests/Integration/vendor/bin/pest --configuration=tests/Integration/phpunit.xml --test-directory=. --mutate --covered-only --path=includes/Auth.php"
+        ],
+        "stan": "phpstan analyze --no-progress --memory-limit=2G",
+        "refactor": "rector",
+        "refactor:sweep": "rector --config=rector-sweep.php",
+        "test:refactor": "rector --dry-run",
+        "test:refactor:sweep": "rector --dry-run --config=rector-sweep.php",
+        "ci": [
+            "@stan",
+            "pint --test",
+            "@test"
+        ]
+    },
+    "scripts-descriptions": {
+        "post-install-cmd": "Wire core.hooksPath to .githooks so the CI-parity pre-commit hook is active in every clone.",
+        "post-update-cmd": "Wire core.hooksPath to .githooks so the CI-parity pre-commit hook is active in every clone.",
+        "setup:integration": "Install the Integration suite's own Composer setup in tests/Integration (Pest 3, PHPUnit 11, wp-phpunit, the polyfills). See #375.",
+        "test": "Run the unit suite and the Integration suite, each in its own process from its own Composer setup. The Integration suite needs the test database: see README.",
+        "test:unit": "Run the Pest 5 suite that needs no WordPress and no database.",
+        "test:integration": "Run the suite that boots WordPress through wp-phpunit, from tests/Integration's own Composer setup.",
+        "test:integration:secret": "Re-run the shared-secret tests in a process where UAMSWP_MIGRATION_API_SECRET is defined. A constant cannot be undefined, so its two states need two processes.",
+        "mutate": "Mutate, from the Integration setup, the three classes mutation can actually reach and require the suite to kill each mutant. Needs a coverage driver; takes minutes. See docs/DECISIONS.md D-023.",
+        "stan": "Run PHPStan at level max.",
+        "refactor": "Apply the gating Rector profile.",
+        "refactor:sweep": "Apply every Rector rule, including judgment-call ones. Review the diff.",
+        "test:refactor": "Preview the gating Rector profile.",
+        "test:refactor:sweep": "Preview the sweep Rector profile.",
+        "ci": "Run the full validation chain: PHPStan, Pint, Pest."
+    },
+    "repositories": [
+        {
+            "name": "wpackagist",
+            "type": "composer",
+            "url": "https://wpackagist.org"
+        }
+    ]
+}

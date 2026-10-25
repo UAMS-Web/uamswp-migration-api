@@ -1,0 +1,39 @@
+{
+    "name": "uamswp_cdt_fixture",
+    "relationship": {
+        "type": "post",
+        "post_type": "post"
+    },
+    "primary_key": [
+        "id"
+    ],
+    "keys": [
+        {
+            "name": "post_id",
+            "columns": [
+                "post_id"
+            ],
+            "unique": true
+        }
+    ],
+    "columns": [
+        {
+            "name": "id",
+            "format": "%d",
+            "null": false,
+            "auto_increment": true,
+            "unsigned": true
+        },
+        {
+            "name": "post_id",
+            "format": "%d"
+        },
+        {
+            "name": "cdt_fixture_headline",
+            "map": {
+                "type": "acf_field_name",
+                "identifier": "cdt_fixture_headline"
+            }
+        }
+    ]
+}

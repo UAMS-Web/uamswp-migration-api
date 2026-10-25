@@ -1,0 +1,91 @@
+# Template: .claude/skills/update-dependencies-ticket/templates/dependabot.yml in
+# UAMS-Web/uams-claude-skills, copied to .github/dependabot.yml (#369).
+#
+# Weekly version updates. Alerts and security updates are enabled for the whole organization
+# and do not depend on this file; this file adds the routine updates, which run only where a
+# repository commits it. Each pull request it opens goes through the same pre-merge check as
+# any other change, and one that changes composer.lock is re-checked against the repository's
+# patches per the update-dependencies-ticket skill.
+#
+# One entry per manifest directory. Minor and patch updates are grouped per entry, so a week
+# produces a few pull requests rather than one per package; a major update stays in a pull
+# request of its own.
+#
+# Differences from the template: this repository has no composite action under
+# .github/actions/, so the github-actions entry reads the workflows at / only. It has no
+# submodules, so there is no submodule entry. composer also reads https://wpackagist.org,
+# which is public, so no registry credentials are declared here.
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /
+    target-branch: main
+    schedule:
+      interval: weekly
+    groups:
+      composer-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    # Deliberate pins (#428). An ignored dependency also leaves its group, so a held
+    # package cannot hold back the rest of the group.
+    ignore:
+      # D-030: the free fallback is pinned to ACF PRO's minor (~6.4.0); moving it is its own ticket.
+      - dependency-name: wpackagist-plugin/advanced-custom-fields
+      # Tracks production WordPress 6.8.7, so majors and minors are held; patch updates within 6.8
+      # still run. Dependabot moves a ~6.8.0 constraint to the next minor (#430, #431).
+      - dependency-name: wp-phpunit/wp-phpunit
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+
+  # The Integration suite's own Composer project (#375, #398). It pins Pest 3 and PHPUnit 11
+  # because WordPress' test bootstrap needs yoast/phpunit-polyfills, so a major update here is
+  # expected to be declined until that changes.
+  - package-ecosystem: composer
+    directory: /tests/Integration
+    target-branch: main
+    schedule:
+      interval: weekly
+    groups:
+      composer-integration-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    # Deliberate pins (#428), as in the root entry.
+    ignore:
+      # D-030: the free fallback is pinned to ACF PRO's minor (~6.4.0); moving it is its own ticket.
+      - dependency-name: wpackagist-plugin/advanced-custom-fields
+      # D-089: pinned so the suite runs against the storage the redirect endpoints serve.
+      - dependency-name: wpackagist-plugin/pretty-link
+      # D-089, as above.
+      - dependency-name: wpackagist-plugin/redirection
+      # Tracks production WordPress 6.8.7, so majors and minors are held; patch updates within 6.8
+      # still run. Dependabot moves a ~6.8.0 constraint to the next minor (#430, #431).
+      - dependency-name: wp-phpunit/wp-phpunit
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+
+  # The workflows under .github/workflows/.
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: main
+    schedule:
+      interval: weekly
+    groups:
+      github-actions-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /
+    target-branch: main
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - minor
+          - patch

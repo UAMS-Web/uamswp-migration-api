@@ -1,0 +1,159 @@
+--- a/src/MutationTest.php
++++ b/src/MutationTest.php
+@@ -11,11 +11,25 @@
+ use Pest\Mutate\Support\Configuration\Configuration;
+ use Pest\Mutate\Support\MutationTestResult;
+ use Pest\Support\Container;
++use RuntimeException;
+ use Symfony\Component\Process\Exception\ProcessTimedOutException;
+ use Symfony\Component\Process\Process;
+ 
+ class MutationTest
+ {
++    /**
++     * The longest command line cmd.exe accepts. On Windows every Symfony Process runs as
++     * `cmd.exe /V:ON /E:ON /D /C (...)`, whatever the executable, so this bounds every mutant child.
++     */
++    private const WINDOWS_COMMAND_LINE_LIMIT = 8191;
++
++    /**
++     * Room left for what is added around the arguments: the cmd.exe path and switches, the
++     * stdout/stderr redirections to temporary files, and the batch launcher re-issuing its own
++     * command line. Deliberately generous, because over-estimating only widens a filter.
++     */
++    private const WINDOWS_COMMAND_LINE_HEADROOM = 1024;
++
+     private MutationTestResult $result = MutationTestResult::None;
+ 
+     private ?float $start = null;
+@@ -81,6 +95,8 @@
+             $envs['LARAVEL_PARALLEL_TESTING'] = 1;
+         }
+ 
++        $filter = self::childFilter($filters, [...$originalArguments, '--bail'], DIRECTORY_SEPARATOR === '\\', $this->mutation->file->getRealPath().':'.$this->mutation->startLine);
++
+         // TODO: filter arguments to remove unnecessary stuff (Teamcity, Coverage, etc.)
+         $process = new Process(
+             command: [
+@@ -92,10 +108,10 @@
+                 // batch launcher, and cmd.exe's re-parse leaves the `|` between two or more test
+                 // names bare -- it pipes, the child exits without running a test, and
+                 // hasFinished() scores it killed. See #296.
+-                '--filter='.implode('|', $filters),
++                '--filter='.$filter,
+             ],
+             env: $envs,
+-            timeout: $this->calculateTimeout(),
++            timeout: self::childTimeout($this->initialTestSuiteDuration(), $filter !== implode('|', $filters)),
+         );
+ 
+         $this->start = microtime(true);
+@@ -107,12 +123,104 @@
+         return true;
+     }
+ 
+-    private function calculateTimeout(): int
++    /**
++     * The --filter value for a mutant child, kept short enough to launch and to compile.
++     *
++     * The filter names every covering test, so a heavily covered mutant can break it in two
++     * ways, and each ends in a mutant scored without running a test:
++     *
++     * - On Windows, the child's command line passes cmd.exe's limit. That child exits 1 without
++     *   running a test, and hasFinished() reads any non-zero exit as a kill. See #313.
++     * - On every platform, the joined pattern passes PCRE's compiled-size limit. PHPUnit wraps
++     *   the filter as `/<filter>/i`; when that does not compile it matches no test name, so the
++     *   child prints "No tests found.", exits 0, and is scored untested. See #408.
++     *
++     * Either way the filter is widened to the covering test CLASSES, which only adds tests that
++     * exercise the same code, so a kill they score is still real. If even that does not fit,
++     * the run refuses rather than score a mutant it cannot test.
++     *
++     * @param  array<int, string>  $filters  One pattern per covering test, `Class::(.*)name`
++     * @param  array<int, string>  $command  The child's arguments before --filter
++     *
++     * @throws RuntimeException When even the class-level filter cannot launch or compile
++     */
++    public static function childFilter(array $filters, array $command, bool $windows, string $mutant = ''): string
+     {
+-        $initialTestSuiteDuration = Container::getInstance()->get(TelemetryRepository::class) // @phpstan-ignore-line
+-            ->getInitialTestSuiteDuration();
++        $filter = implode('|', $filters);
+ 
+-        return (int) ($initialTestSuiteDuration + max(5, $initialTestSuiteDuration * 0.2));
++        $budget = self::WINDOWS_COMMAND_LINE_LIMIT - self::WINDOWS_COMMAND_LINE_HEADROOM;
++
++        // Every argument is counted as if quoted and space-separated, which is at least as long
++        // as what Symfony Process builds from it.
++        $length = static fn (string $candidate): int => array_sum(array_map(
++            static fn (string $argument): int => strlen($argument) + 3,
++            [...$command, '--filter='.$candidate],
++        ));
++
++        // Compiled exactly as PHPUnit's NameFilterIterator compiles a filter it is given. The
++        // compile warning is swallowed by a handler of its own rather than `@`, because a test
++        // runner's handler still records a warning `@` suppressed.
++        $compiles = static function (string $candidate): bool {
++            set_error_handler(static fn (): bool => true);
++
++            try {
++                return preg_match('/'.str_replace('/', '\\/', $candidate).'/i', '') !== false;
++            } finally {
++                restore_error_handler();
++            }
++        };
++
++        $usable = static fn (string $candidate): bool => (! $windows || $length($candidate) <= $budget)
++            && $compiles($candidate);
++
++        if ($usable($filter)) {
++            return $filter;
++        }
++
++        $classes = implode('|', array_values(array_unique(array_map(
++            static fn (string $pattern): string => explode('::', $pattern, 2)[0].'::',
++            $filters,
++        ))));
++
++        if ($usable($classes)) {
++            return $classes;
++        }
++
++        throw new RuntimeException(sprintf(
++            'Cannot test the mutant at %s: its %d covering tests, even named by class, make a filter '
++            .'of %d characters that %s. Scoring it would report a result without running a test. '
++            .'See #313 and #408.',
++            $mutant,
++            count($filters),
++            strlen($classes),
++            $windows && $length($classes) > $budget
++                ? sprintf('passes cmd.exe\'s limit of %d characters', self::WINDOWS_COMMAND_LINE_LIMIT)
++                : 'PCRE cannot compile',
++        ));
++    }
++
++    /**
++     * The time limit for a mutant child, in seconds.
++     *
++     * The plugin's own limit is the initial run plus max(5 s, 20%), which fits a child running
++     * only the tests that cover its mutant. A child whose filter childFilter() widened to whole
++     * test classes can run nearly the whole suite plus its own setup, and overruns that limit;
++     * the plugin then scores the timeout as caught, so a mutant no test observes counts as
++     * killed. A widened child therefore gets at least three times the initial run. A child that
++     * was not widened keeps the plugin's limit, so a mutant that really loops still times out
++     * as before. See #447.
++     */
++    public static function childTimeout(float $initialTestSuiteDuration, bool $widened): int
++    {
++        $limit = (int) ($initialTestSuiteDuration + max(5, $initialTestSuiteDuration * 0.2));
++
++        return $widened ? max($limit, (int) ($initialTestSuiteDuration * 3)) : $limit;
++    }
++
++    private function initialTestSuiteDuration(): float
++    {
++        return Container::getInstance()->get(TelemetryRepository::class) // @phpstan-ignore-line
++            ->getInitialTestSuiteDuration();
+     }
+ 
+     public function hasFinished(): bool

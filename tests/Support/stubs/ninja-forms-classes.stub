@@ -1,0 +1,242 @@
+<?php
+
+/**
+ * Ninja Forms, by signature only, for static analysis.
+ *
+ * A stub rather than `scanDirectories`, and the reason differs from the
+ * Formidable and Gravity Forms stubs beside it. Those plugins are paid and
+ * absent on CI. Ninja Forms is FREE and IS present — it is a dev dependency —
+ * but pointing the analyzer at `vendor/wpackagist-plugin/ninja-forms` would
+ * analyze a large third-party tree at `level: max` and red the run on its
+ * code rather than on this repo's.
+ *
+ * Only what this repo calls is declared. Defaults are copied exactly from the
+ * plugin, because they are the point: `$fresh = false` on the two child
+ * readers is why `NinjaPayload` passes `true`.
+ *
+ * Never loaded at runtime. The `.stub` extension keeps it out of `paths`
+ * analysis and nothing requires it, so the real classes are what execute.
+ */
+class NF_Database_Models_Form
+{
+    /**
+     * @param  wpdb  $db
+     * @param  int|string  $id
+     */
+    public function __construct($db, $id = '')
+    {
+    }
+
+    /**
+     * Constructs happily for an id that does not exist, answering with empty
+     * settings — which is why `FormsController::ninjaForm()` checks the table
+     * before building one.
+     *
+     * @return int|string
+     */
+    public function get_id()
+    {
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function get_settings()
+    {
+    }
+
+    /**
+     * @param  string  $key
+     * @return mixed
+     */
+    public function get_setting($key)
+    {
+    }
+
+    /**
+     * @param  array<string, mixed>  $settings
+     * @return $this
+     */
+    public function update_settings($settings)
+    {
+    }
+
+    /**
+     * NOT `$this`. `NF_Abstracts_Model::save()` returns an
+     * `array( tmp_id => id )` when a temporary id was set, and null otherwise
+     * — so `->save()->get_id()` fatals. Declaring `$this` here would make
+     * PHPStan green-light exactly that call.
+     *
+     * @return array<int|string, int|string>|null
+     */
+    public function save()
+    {
+    }
+
+    /*
+     * `get_fields()` and `get_actions()` are DELIBERATELY ABSENT here.
+     *
+     * They are `NF_Abstracts_ModelFactory` methods; the real
+     * `NF_Database_Models_Form` is `final` and has neither. An earlier version
+     * of this stub declared them on the form model, which made PHPStan at
+     * `level: max` green-light exactly the call that shipped this endpoint's
+     * empty-payload defect. A stub that misdeclares an API is worse than no
+     * stub: it makes the analyzer agree with code that fatals.
+     */
+}
+
+class NF_Database_Migrations
+{
+    /**
+     * Creates or updates the `nf3_*` tables. Normally runs on activation; the
+     * test bootstrap calls it explicitly, because it never activates anything.
+     */
+    public function migrate(): void
+    {
+    }
+}
+
+/**
+ * The factory `Ninja_Forms()->form()` returns.
+ *
+ * Declared only as far as the tests drive it. Note `field()`: it MUTATES the
+ * factory, swapping `_object` from the form to a field, and the factory is
+ * memoized per id in a `static` — which is one of the reasons `NinjaPayload`
+ * reads the child tables instead of going through here.
+ */
+class NF_Abstracts_ModelFactory
+{
+    /**
+     * @return NF_Database_Models_Form
+     */
+    public function get()
+    {
+    }
+
+    /**
+     * @param  int|string  $id
+     * @return $this
+     */
+    public function field($id = '')
+    {
+    }
+
+    /**
+     * @param  array<string, mixed>  $where
+     * @return array<int, NF_Database_Models_Form>
+     */
+    public function get_forms(array $where = [])
+    {
+    }
+
+    /**
+     * Where `get_fields()` actually lives — on the FACTORY, not on the form.
+     *
+     * @param  array<string, mixed>  $where
+     * @param  bool  $fresh  Defaults to FALSE, which serves whatever the model already holds.
+     * @return array<int, NF_Database_Models_Field>
+     */
+    public function get_fields($where = [], $fresh = false)
+    {
+    }
+
+    /**
+     * @param  array<string, mixed>  $where
+     * @param  bool  $fresh  Defaults to FALSE, as above.
+     * @return array<int, NF_Database_Models_Action>
+     */
+    public function get_actions($where = [], $fresh = false)
+    {
+    }
+}
+
+class Ninja_Forms
+{
+    /**
+     * @param  int|string  $id
+     */
+    public function form($id = ''): NF_Abstracts_ModelFactory
+    {
+    }
+}
+
+function Ninja_Forms(): Ninja_Forms
+{
+}
+
+class NF_Database_Models_Field
+{
+    /**
+     * `$id` is REQUIRED on the real class — `__construct( $db, $id,
+     * $parent_id = '' )` — so a default here would let the analyzer accept a
+     * two-argument call that raises ArgumentCountError. Pass `''` explicitly
+     * to build an unsaved model.
+     *
+     * @param  wpdb  $db
+     * @param  int|string  $id
+     * @param  int|string  $parent_id
+     */
+    public function __construct($db, $id, $parent_id = '')
+    {
+    }
+
+    /**
+     * Inherited from `NF_Abstracts_Model`. Empty until `save()` has run.
+     *
+     * @return int|string
+     */
+    public function get_id()
+    {
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function get_settings()
+    {
+    }
+
+    /**
+     * @param  array<string, mixed>  $settings
+     * @return $this
+     */
+    public function update_settings($settings)
+    {
+    }
+
+    /**
+     * NOT `$this`. `NF_Abstracts_Model::save()` returns an
+     * `array( tmp_id => id )` when a temporary id was set, and null otherwise
+     * — so `->save()->get_id()` fatals. Declaring `$this` here would make
+     * PHPStan green-light exactly that call.
+     *
+     * @return array<int|string, int|string>|null
+     */
+    public function save()
+    {
+    }
+}
+
+class NF_Database_Models_Action
+{
+    /**
+     * `$id` is REQUIRED on the real class — `__construct( $db, $id,
+     * $parent_id = '' )` — so a default here would let the analyzer accept a
+     * two-argument call that raises ArgumentCountError. Pass `''` explicitly
+     * to build an unsaved model.
+     *
+     * @param  wpdb  $db
+     * @param  int|string  $id
+     * @param  int|string  $parent_id
+     */
+    public function __construct($db, $id, $parent_id = '')
+    {
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function get_settings()
+    {
+    }
+}

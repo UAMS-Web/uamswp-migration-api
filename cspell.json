@@ -1,0 +1,45 @@
+{
+    "version": "0.2",
+    "language": "en",
+    "dictionaryDefinitions": [
+        {
+            "name": "project-words",
+            "path": "./project-words.txt",
+            "addWords": true
+        }
+    ],
+    "dictionaries": ["project-words"],
+    // GitHub Projects V2 node ids (PVT_…, PVTSSF_…, PVTIF_…) are opaque
+    // base64-ish handles, not words. They belong in a pattern, not in the
+    // dictionary -- allow-listing their fragments would let a real
+    // misspelling through anywhere those letter runs appear.
+    // Slack team, channel, user and bot ids are the same kind of handle and get
+    // the same treatment for the same reason: their letter runs in the
+    // dictionary would excuse those runs everywhere, including inside a genuine
+    // typo. Deliberately NOT quoting an example id here -- the pattern below
+    // matches a whole id, not the fragments cspell would flag inside one, so an
+    // example in this comment would fail the gate that the comment explains.
+    //
+    // The second character must be a DIGIT, which is what keeps the pattern off
+    // ordinary all-caps words: several English words begin with a Slack prefix
+    // letter and would otherwise be silently ignored.
+    // cspell:ignore TCUGDBWEA
+    "ignoreRegExpList": ["/\\bPVT[A-Za-z0-9_-]+/g", "/\\b[TCUGDBWEA][0-9][A-Z0-9]{7,}\\b/g"],
+    // `--dot` in the npm script lets the gate see .claude/, .github/ and
+    // .gitignore — first-party prose that would otherwise go unchecked. That
+    // also makes every OTHER dot-path reachable, so each exclusion below is
+    // deliberate rather than incidental.
+    "ignorePaths": [
+        ".git/**",
+        ".phpstan/**",
+        "vendor/**",
+        "tests/Integration/vendor/**",
+        "tests/Integration/composer.lock",
+        "node_modules/**",
+        "project-words.txt",
+        "composer.lock",
+        "package-lock.json",
+        "*.min.js",
+        "*.min.css"
+    ]
+}

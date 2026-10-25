@@ -1,0 +1,20 @@
+/vendor/
+# The Integration suite's own Composer setup (#375).
+/tests/Integration/vendor/
+/node_modules/
+
+# PHPStan's cache. Checkout-scoped by phpstan.neon.dist `tmpDir` — see the
+# comment there for why the machine-global default is unusable.
+/.phpstan/
+
+.DS_Store
+
+# Per-container Claude Code settings (ported from wordpress-importer#515).
+# ONLY the per-machine file: `settings.json`, `rules/` and `skills/` are
+# committed here deliberately and are the point of the directory.
+.claude/settings.local.json
+
+# A deployment's own overrides, merged over config/defaults.php by Config::all().
+# Per-install by design, and it can carry anything a filter could, so it is
+# never committed. The Feature suite also writes one briefly to prove it is read.
+/config/local.php

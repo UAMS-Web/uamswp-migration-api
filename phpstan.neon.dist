@@ -1,0 +1,180 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+    - vendor/phpstan/phpstan-mockery/extension.neon
+    # Pest's own extension, shipped inside pestphp/pest. Registers Pest\Expectation
+    # and HigherOrderTapProxy as universal object crates, so chained expectations
+    # analyze instead of reporting undefined properties.
+    - vendor/pestphp/pest/extension.neon
+    # PHPStan's opt-in preview channel — turns on rules and stricter analysis
+    # that become default in the next major, so the eventual major upgrade
+    # carries no accumulated analysis debt. Ships inside phpstan/phpstan, so it
+    # adds no dependency.
+    - vendor/phpstan/phpstan/conf/bleedingEdge.neon
+
+parameters:
+    # Opened at `max`, deliberately, with no climb.
+    #
+    # There was no analysis debt to pay down: this repo was a thousand lines old
+    # when the analyzer arrived. Starting anywhere lower would mean choosing to
+    # accrue debt that would then have to be retired one level at a time.
+    #
+    # Pinned by tests/Unit/ToolchainConfigTest.php. Lowering it should be a
+    # deliberate, argued change, not a quiet edit to get a red build green.
+    level: max
+
+    # The deployment target, stated explicitly — the only thing in the whole
+    # gate that knows this plugin ships to PHP 8.2.
+    #
+    # Every tool that runs locally runs on 8.4: pestphp/pest v5 requires ^8.4
+    # and phpunit/phpunit 13 requires >=8.4.1, so the suite CANNOT execute on
+    # the version production actually runs (8.2.30). Left implicit, PHPStan
+    # infers a version range from composer.json's `^8.2` and does not report
+    # constructs that are unavailable at the floor — a typed class constant
+    # (`private const string FOO = '…'`, PHP 8.3+) analyzed clean here and
+    # would be a PARSE ERROR in production. Verified, not assumed.
+    #
+    # A range rather than a single `phpVersion: 80200`, deliberately. The
+    # single-version form also catches the construct, but it stops matching the
+    # `if.alwaysFalse` ignore below and reds the run with `ignore.unmatched`.
+    phpVersion:
+        min: 80200
+        max: 80400
+
+    # WordPress' test suite, indexed but not analyzed.
+    #
+    # `php-stubs/wordpress-stubs` covers core's runtime surface and stops there —
+    # `WP_UnitTestCase`, the factories and `tests_add_filter()` ship with the test
+    # suite, not with WordPress. Without this the Feature suite analyzes as a pile
+    # of undefined classes and methods, which would leave `tests/` either excluded
+    # from analysis or permanently red.
+    scanDirectories:
+        - vendor/wp-phpunit/wp-phpunit/includes
+
+        # ACF, indexed but not analyzed.
+        #
+        # The plugin reads ACF through four functions (D-024) and none of them
+        # exist as far as `php-stubs/wordpress-stubs` is concerned, so without
+        # this every call is `function.notFound` and the reader cannot be
+        # analyzed at all. The *free* copy is scanned rather than the PRO one in
+        # the sibling plugin directory: it is a Composer dependency, so it is
+        # present on every machine and on a CI runner, where PRO can never be.
+        # Nothing this plugin calls is PRO-only — the PRO containers are data it
+        # walks, not API it invokes.
+        - vendor/wpackagist-plugin/advanced-custom-fields/includes
+
+    # ACF Custom Database Tables, by signature only.
+    #
+    # A stub rather than `scanDirectories`: the plugin is paid, is not a Composer
+    # package, and is absent on CI, so pointing the analyzer at its directory
+    # would red every remote run. See tests/Support/stubs for what is declared.
+    # `scanFiles`, not `stubFiles`: the latter overrides signatures of symbols
+    # PHPStan already knows about, where these symbols are unknown entirely.
+    # The .stub extension keeps them out of `paths` analysis, since PHPStan
+    # analyzes .php only.
+    scanFiles:
+        - tests/Support/stubs/acf-cdt-classes.stub
+        - tests/Support/stubs/acf-cdt-functions.stub
+        - tests/Support/stubs/gravity-forms-classes.stub
+        - tests/Support/stubs/formidable-classes.stub
+        # Ninja Forms differs from the three above: it is FREE and IS present,
+        # as a dev dependency. Stubbed anyway, because `scanDirectories` on
+        # `vendor/wpackagist-plugin/ninja-forms` would analyze a large
+        # third-party tree at `level: max` and red the run on its code.
+        - tests/Support/stubs/ninja-forms-classes.stub
+        - tests/Support/stubs/redirect-plugins-classes.stub
+
+    paths:
+        - includes
+        - config
+        - scripts
+        - uamswp-migration-api.php
+        # First-party test code is analyzed at the same level as source. Test
+        # bugs — broken mocks, wrong-typed fixtures, assertions calling methods
+        # that no longer exist — are real bugs.
+        - tests
+
+    # The Integration suite's own Composer setup (#375). Its `vendor/` is a
+    # second dependency tree inside `tests/`, so without this every package in
+    # it would be analyzed at `level: max` as if it were first-party test code.
+    excludePaths:
+        analyseAndScan:
+            - tests/Integration/vendor
+        # These two files test the PATCHED v3 `pest-plugin-mutate` that only the
+        # Integration setup installs. The root has the v5 plugin, which has no
+        # `MutationTest::childFilter()`, and nothing outside the Integration
+        # vendor tree can show the analyzer the v3 class. Pest runs them there.
+        analyse:
+            - tests/Integration/Mutate
+
+    # Pest 5 types a test closure's `$this` as TestCall; restore TestCase. See
+    # the stub for why, and #375 for the two setups it covers.
+    stubFiles:
+        - tests/Support/stubs/pest-closure-this.stub
+
+    # Checkout-scoped cache. PHPStan's default tmpDir is `sys_get_temp_dir()/phpstan` —
+    # machine-global, shared by every checkout and worktree on the machine. The
+    # cache stores ABSOLUTE phar paths, so deleting the worktree that populated
+    # it leaves every stored path dangling, and the next run in a live checkout
+    # dies with internal errors of the form `"phar://…/vendor/phpstan/
+    # phpstan.phar/…" is not a file` — while blaming whichever source file
+    # happened to be under analysis. That reads as a real defect in the diff.
+    #
+    # Neither obvious remedy works: `clear-result-cache` leaves most of the
+    # directory in place, and `rm -rf` races any concurrent session analyzing in
+    # it. A RELATIVE path resolves against this file's directory, so each
+    # checkout gets its own cache and a deleted one takes only its own with it.
+    # There is no `--tmp-dir` CLI flag, so this key is the only lever.
+    tmpDir: .phpstan
+
+    # WordPress ships a very large global function surface; the stubs cover it,
+    # but core's own docblocks are loose enough that a few dynamic returns
+    # cannot be narrowed. Add ignores here only with a comment naming the core
+    # function responsible — never a blanket pattern.
+    ignoreErrors:
+        # The PHP 8.2 runtime guard in the plugin header. PHPStan analyzes at
+        # the version composer.json requires (^8.2), so `version_compare(
+        # PHP_VERSION, '8.2', '<')` is always false *to the analyzer* — but the
+        # guard exists precisely for the case the analyzer cannot model: a site
+        # downgraded underneath an already-active plugin, where the alternative
+        # to this branch is a fatal error instead of an admin notice.
+        -
+            identifier: if.alwaysFalse
+            path: uamswp-migration-api.php
+
+        # Pest routes its entire public API through classes it tags @internal.
+        # expect()->toBe() lands on Pest\Mixins\Expectation, it(…)->skip() on
+        # Pest\PendingCalls\TestCall, uses(…)->in() on Pest\PendingCalls\UsesCall.
+        # bleedingEdge's internal-class rules flag each as "use from outside root
+        # namespace Pest", but calling these from a test is Pest's intended use —
+        # the @internal tag discourages *extending* Pest's internals, not writing
+        # tests with them.
+        #
+        # Pinned by identifier, by the Pest namespace, and to tests/, so
+        # internal-class misuse of any other vendor — and of Pest anywhere outside
+        # the suite — still fails.
+        #
+        # `pestphp/pest-plugin-phpstan` supplies a real extension for this, and it
+        # is why the repo carried it. That package exists only for Pest 5, which
+        # requires PHP 8.4; it went when the toolchain came down to the 8.2
+        # deployment target. See docs/DECISIONS.md D-019.
+        -
+            identifier: method.internalClass
+            message: '#of internal class Pest\\#'
+            path: tests
+
+        # `$this` inside a Pest `it()` closure analyzes as `PHPUnit\Framework\TestCase`
+        # regardless of `uses(WordPressTestCase::class)->in('Feature')` — that binding
+        # is a Pest runtime mechanism, invisible to static analysis without
+        # `pestphp/pest-plugin-phpstan`, the same Pest-5-only package the entry above
+        # already explains is gone from this toolchain (D-019). `factory()` sidesteps
+        # this by being called statically (`WordPressTestCase::factory()`, see
+        # tests/Support/helpers.php); `setExpectedIncorrectUsage()` cannot be, since it
+        # mutates the current test's own state and only exists to be called on `$this`.
+        #
+        # Pinned by identifier, by the method name, and to tests/Integration, so an
+        # undefined method anywhere else — including a genuine typo on `$this` — still
+        # fails.
+        -
+            identifier: method.notFound
+            message: '#::setExpectedIncorrectUsage\(\)#'
+            path: tests/Integration

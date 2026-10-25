@@ -1,0 +1,222 @@
+<?php
+
+/**
+ * Gravity Forms, by signature only, for static analysis.
+ *
+ * A stub rather than `scanDirectories`, for the reason the ACF Custom Database
+ * Tables stub beside it gives: the plugin is paid, is not a Composer package,
+ * and is absent on CI, so pointing the analyzer at its directory would red
+ * every remote run.
+ *
+ * Only what this repo calls is declared, and the return types are narrowed from
+ * the plugin's own docblocks where those say `mixed` — `GFAPI::get_form()` is
+ * documented `mixed The form meta array or false`, and the union is the fact
+ * the controller branches on.
+ *
+ * Never loaded at runtime. The `.stub` extension keeps it out of `paths`
+ * analysis (PHPStan analyzes `.php` only) and nothing requires it, so the real
+ * classes are what execute.
+ */
+
+/**
+ * @phpstan-type GravityForm array<string, mixed>
+ */
+class GFAPI
+{
+    /**
+     * @param  int  $form_id
+     * @return array<string, mixed>|false The form meta array, or false when there is no such form.
+     */
+    public static function get_form($form_id)
+    {
+    }
+
+    /**
+     * @param  bool|null  $active  True for active forms, false for inactive, null for both.
+     * @param  bool|null  $trash  True for trashed forms, false to exclude them, null for both.
+     * @param  string  $sort_column
+     * @param  string  $sort_dir
+     * @return array<int, array<string, mixed>|false> Element type is a union because
+     *         `get_forms()` is a loop over `get_form()`, and a form deleted between the
+     *         id query and the fetch yields `false` in the middle of the list.
+     */
+    public static function get_forms($active = true, $trash = false, $sort_column = 'id', $sort_dir = 'ASC')
+    {
+    }
+
+    /**
+     * @param  array<string, mixed>  $form_meta
+     * @return int|WP_Error
+     */
+    public static function add_form($form_meta)
+    {
+    }
+
+    /**
+     * @param  int  $form_id
+     * @return bool|WP_Error
+     */
+    public static function delete_form($form_id)
+    {
+    }
+
+    /**
+     * `$is_active` is `bool|null` and the null is the whole point: the plugin
+     * documents it as "Use null to return both", and the DEFAULT of `true`
+     * silently drops every disabled feed (#80, and D-043 one method along).
+     *
+     * The `WP_Error` in the return union is not defensive padding. It is what
+     * an EMPTY result returns — `if ( empty( $results ) ) { return new WP_Error(
+     * 'not_found', … ) }` — and what a missing `gf_addon_feed` table returns,
+     * which is the ordinary state of any site that has never had a feed add-on.
+     *
+     * @param  int|int[]|null  $feed_ids
+     * @param  int|int[]|null  $form_ids
+     * @param  string|null  $addon_slug
+     * @param  bool|null  $is_active  True for active feeds, false for inactive, null for both.
+     * @return array<int, array<string, mixed>>|WP_Error
+     */
+    public static function get_feeds($feed_ids = null, $form_ids = null, $addon_slug = null, $is_active = true)
+    {
+    }
+
+    /**
+     * Declared for the FIXTURES only. `includes/` may never call this, and
+     * `tests/Unit/FormEntryBoundaryTest.php` fails a run that does.
+     *
+     * `int|string` on `$feed_meta`, not `string` alone: a real feed's meta
+     * can be numeric-keyed (`GravityFeedPayload::build()`'s docblock on the
+     * `(object)` cast is why), and a fixture has to be able to write one.
+     *
+     * @param  int  $form_id
+     * @param  array<int|string, mixed>  $feed_meta
+     * @param  string  $addon_slug
+     * @return int|WP_Error
+     */
+    public static function add_feed($form_id, $feed_meta, $addon_slug)
+    {
+    }
+
+    /**
+     * Fixtures only, as `add_feed()` above.
+     *
+     * @param  int  $feed_id
+     * @return bool|WP_Error
+     */
+    public static function delete_feed($feed_id)
+    {
+    }
+
+    /**
+     * Fixtures only, as `add_feed()` above. It is how a test makes a DISABLED
+     * feed: `add_feed()` does not write the column, which defaults to 1.
+     *
+     * @param  int  $feed_id
+     * @param  string  $property_name
+     * @param  mixed  $property_value
+     * @return bool|WP_Error
+     */
+    public static function update_feed_property($feed_id, $property_name, $property_value)
+    {
+    }
+}
+
+/**
+ * Only `get_base_path()`, and only for the test bootstrap.
+ *
+ * Gravity Forms requires `class-gf-feed-addon.php` on demand rather than at
+ * boot, so the bootstrap has to locate it before it can install the feed table.
+ */
+class GFCommon
+{
+    public static function get_base_path(): string
+    {
+    }
+}
+
+/**
+ * The in-process cache `GFCommon::table_exists()` answers from, by the two
+ * methods a test uses to make a table read as missing and then restore it.
+ */
+class GFCache
+{
+    /**
+     * @param  string  $key
+     * @param  mixed  $data
+     * @param  bool  $is_persistent
+     * @param  int  $expiration_seconds
+     * @return bool
+     */
+    public static function set($key, $data, $is_persistent = false, $expiration_seconds = 0)
+    {
+    }
+
+    /**
+     * @param  string  $key
+     * @return bool
+     */
+    public static function delete($key)
+    {
+    }
+}
+
+/**
+ * The add-on base, by the two methods the bootstrap's fixture add-on reaches.
+ *
+ * `install_translations()` is declared because it is what `setup()` calls first
+ * and it is the one method here that can reach the network — it downloads a
+ * language pack, guarded by `$_enable_rg_autoupgrade`, which defaults to false.
+ * Named rather than left implicit so that the guard staying false is a fact
+ * somebody checked rather than one nobody thought about.
+ */
+abstract class GFAddOn
+{
+    public function setup(): void
+    {
+    }
+
+    /**
+     * @param  string  $locale
+     */
+    public function install_translations($locale = ''): void
+    {
+    }
+}
+
+/**
+ * The feed add-on base.
+ *
+ * Declares no abstract methods of its own, which is what lets the bootstrap
+ * install `gf_addon_feed` through an anonymous subclass rather than through a
+ * copy of the plugin's `CREATE TABLE`.
+ */
+abstract class GFFeedAddOn extends GFAddOn
+{
+}
+
+class GFFormsModel
+{
+    /**
+     * @param  int  $form_id
+     * @return bool
+     */
+    public static function trash_form($form_id)
+    {
+    }
+
+    /**
+     * @param  int  $form_id
+     * @param  int|bool  $is_active
+     */
+    public static function update_form_active($form_id, $is_active): void
+    {
+    }
+
+    /**
+     * Clears `GFFormsModel::$_current_forms`, the plugin's in-process form
+     * cache. Needed by any test that changes a form row underneath the model.
+     */
+    public static function flush_current_forms(): void
+    {
+    }
+}

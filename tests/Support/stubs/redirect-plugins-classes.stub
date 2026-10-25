@@ -1,0 +1,265 @@
+<?php
+
+/**
+ * Redirection and Pretty Links, by signature only, for static analysis.
+ *
+ * A stub rather than `scanDirectories`, for the reason the Ninja Forms stub
+ * gives: both plugins are free dev dependencies and present everywhere, but
+ * pointing the analyzer at their trees would analyze third-party code at
+ * `level: max` and red the run on it rather than on this repo.
+ *
+ * Only what this repo calls is declared, with the return shapes measured in
+ * Redirection 5.10.0 and Pretty Links 4.0.15 (#374).
+ *
+ * Never loaded at runtime. The `.stub` extension keeps it out of `paths`
+ * analysis and nothing requires it, so the real classes are what execute.
+ */
+
+namespace {
+    class Red_Item
+    {
+        /**
+         * Every row of `redirection_items`, unordered.
+         *
+         * @return list<Red_Item>
+         */
+        public static function get_all()
+        {
+        }
+
+        /**
+         * @param  array<string, mixed>  $details
+         * @return Red_Item|WP_Error
+         */
+        public static function create(array $details)
+        {
+        }
+
+        /**
+         * @return int
+         */
+        public function get_id()
+        {
+        }
+
+        /**
+         * @return string
+         */
+        public function get_url()
+        {
+        }
+
+        /**
+         * @return string
+         */
+        public function get_match_url()
+        {
+        }
+
+        /**
+         * @return bool
+         */
+        public function is_regex()
+        {
+        }
+
+        /**
+         * @return string
+         */
+        public function get_match_type()
+        {
+        }
+
+        /**
+         * @return array<string, mixed>|null
+         */
+        public function get_match_data()
+        {
+        }
+
+        /**
+         * @return string
+         */
+        public function get_action_type()
+        {
+        }
+
+        /**
+         * @return int
+         */
+        public function get_action_code()
+        {
+        }
+
+        /**
+         * The column as stored: a URL, or a serialized array for a
+         * conditional match.
+         *
+         * @return string
+         */
+        public function get_action_data()
+        {
+        }
+
+        /**
+         * @return string
+         */
+        public function get_title()
+        {
+        }
+
+        /**
+         * @return int
+         */
+        public function get_position()
+        {
+        }
+
+        /**
+         * @return int
+         */
+        public function get_group_id()
+        {
+        }
+
+        /**
+         * @return bool
+         */
+        public function is_enabled()
+        {
+        }
+
+        /**
+         * @return void
+         */
+        public function disable()
+        {
+        }
+
+        /**
+         * @return array<string, mixed>
+         */
+        public function to_json()
+        {
+        }
+    }
+
+    class Red_Options
+    {
+        /**
+         * The plugin's settings, from a static cache filled on first read.
+         *
+         * @return array<string, mixed>
+         */
+        public static function get(): array
+        {
+        }
+
+        /**
+         * Clear the static settings cache.
+         *
+         * @return void
+         */
+        public static function reset()
+        {
+        }
+    }
+
+    class Red_Group
+    {
+        /**
+         * Every group, as the plugin's JSON shape. The type is the plugin's own
+         * `@phpstan-type GroupJson` (`models/group.php` in 5.10.0), and holds
+         * because the constructor runs `intval()` over every stored id (D-097).
+         *
+         * @param  array<string, mixed>  $params
+         * @return list<array{id: int, name: string, redirects: int, module_id: int, moduleName: string, enabled: bool, default?: bool}>
+         */
+        public static function get_all($params = [])
+        {
+        }
+
+        /**
+         * @param  string  $name
+         * @param  int  $module_id
+         * @param  bool  $enabled
+         * @return Red_Group|false
+         */
+        public static function create($name, $module_id, $enabled = true)
+        {
+        }
+
+        /**
+         * @return int
+         */
+        public function get_id()
+        {
+        }
+
+        /**
+         * @return void
+         */
+        public function disable()
+        {
+        }
+    }
+}
+
+namespace Redirection\Database\Schema {
+    class Latest
+    {
+        /**
+         * @return bool|\WP_Error
+         */
+        public function install()
+        {
+        }
+    }
+}
+
+namespace PrettyLinks {
+    class Bootstrap
+    {
+        public static function version(): string
+        {
+        }
+    }
+}
+
+namespace PrettyLinks\Database {
+    class Migrator
+    {
+        public function __construct(\wpdb $db, string $basePath, string $version)
+        {
+        }
+
+        public function maybeRun(): void
+        {
+        }
+    }
+}
+
+namespace PrettyLinks\Repositories {
+    class Links
+    {
+        /**
+         * @param  array<string, mixed>  $args
+         * @return array{items: array<int, array<string, mixed>>, total: int, pages: int}
+         */
+        public function search(array $args): array
+        {
+        }
+
+        /**
+         * @param  array<string, mixed>  $data
+         * @return array<string, mixed>
+         */
+        public function create(array $data): array
+        {
+        }
+
+        public function softDelete(int $id): bool
+        {
+        }
+    }
+}

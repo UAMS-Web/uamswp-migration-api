@@ -1,0 +1,49 @@
+{
+    "name": "uams-web/uamswp-migration-api-integration-tests",
+    "description": "The Integration suite's own Composer setup. WordPress' test bootstrap requires yoast/phpunit-polyfills, which supports PHPUnit 12 at most, and the root runs Pest 5 on PHPUnit 13 (#375).",
+    "license": "GPL-2.0-or-later",
+    "require-dev": {
+        "cweagans/composer-patches": "^2.0",
+        "pestphp/pest": "^3.8",
+        "phpunit/phpunit": "^11.5",
+        "wp-phpunit/wp-phpunit": "~6.8.0",
+        "wpackagist-plugin/advanced-custom-fields": "~6.4.0",
+        "wpackagist-plugin/ninja-forms": "~3.15.0",
+        "wpackagist-plugin/pretty-link": "4.0.15",
+        "wpackagist-plugin/redirection": "5.10.0",
+        "yoast/phpunit-polyfills": "^4.0"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "UAMSWP\\MigrationAPI\\": "../../includes/",
+            "UAMSWP\\MigrationAPI\\Tests\\": "../"
+        },
+        "exclude-from-classmap": [
+            "../Support/phpunit-removed-classes.php"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "platform": {
+            "php": "8.4.1"
+        },
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "composer/installers": false,
+            "cweagans/composer-patches": true
+        }
+    },
+    "repositories": [{
+        "name": "wpackagist",
+        "type": "composer",
+        "url": "https://wpackagist.org"
+    }],
+    "extra": {
+        "patches": {
+            "pestphp/pest-plugin-mutate": {
+                "Let a mutant child on Windows run its tests and write files, so its failure is a real kill (temporary; see #296)": "../../patches/pest-plugin-mutate-windows-mutant-child.patch",
+                "Widen or refuse a Windows mutant child's filter that would pass cmd.exe's command-line limit, so it cannot score a kill without running a test (temporary; see #313)": "../../patches/pest-plugin-mutate-windows-filter-length.patch"
+            }
+        }
+    }
+}

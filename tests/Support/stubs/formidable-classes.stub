@@ -1,0 +1,169 @@
+<?php
+
+/**
+ * Formidable Forms, by signature only, for static analysis.
+ *
+ * A stub rather than `scanDirectories`, for the reason the ACF Custom Database
+ * Tables and Gravity Forms stubs beside it give: the plugin is paid, is not a
+ * Composer package, and is absent on CI, so pointing the analyzer at its
+ * directory would red every remote run.
+ *
+ * Only what this repo calls is declared, and the defaults are copied exactly
+ * from the plugin — they are the point. `get_published_forms()` is declared
+ * here even though nothing calls it, so the analyzer can see why: three
+ * defaults that each drop data from a migration (D-046).
+ *
+ * Never loaded at runtime. The `.stub` extension keeps it out of `paths`
+ * analysis and nothing requires it, so the real classes are what execute.
+ */
+class FrmForm
+{
+    /**
+     * @param  int|string  $id
+     * @param  int|false  $blog_id
+     * @return stdClass|false Applies NO status filter — a trashed form comes back like any other.
+     */
+    public static function getOne($id, $blog_id = false)
+    {
+    }
+
+    /**
+     * @param  array<string, mixed>|string  $where
+     * @param  string  $order_by
+     * @param  string|int  $limit  `''` means no limit. `0` compiles to `LIMIT 0` and returns nothing.
+     * @return array<int, stdClass>|stdClass|null Returns a BARE object, not a list, when `$limit` is `1`
+     *         or `' LIMIT 1'` — the method `reset()`s the result in that case.
+     */
+    public static function getAll($where = [], $order_by = '', $limit = '')
+    {
+    }
+
+    /**
+     * The call this repo deliberately does NOT use. Each default drops data:
+     * `$limit` caps at 999, `$inc_children` hides child forms, and the query
+     * pins `status` so drafts vanish. See D-046.
+     *
+     * @param  array<string, mixed>  $query
+     * @param  int  $limit
+     * @param  string  $inc_children
+     * @return array<int, stdClass>
+     */
+    public static function get_published_forms($query = [], $limit = 999, $inc_children = 'exclude')
+    {
+    }
+
+    /**
+     * @param  array<string, mixed>  $values
+     * @return int|false
+     */
+    public static function create($values)
+    {
+    }
+
+    /**
+     * @param  int  $id
+     * @return bool
+     */
+    public static function trash($id)
+    {
+    }
+}
+
+class FrmField
+{
+    /**
+     * @param  int  $form_id
+     * @param  string|int  $limit  `''` means no limit.
+     * @param  string  $inc_embed  Defaults to `'exclude'`, which omits embedded-form fields.
+     * @param  string  $inc_repeat
+     * @return array<int, stdClass>
+     */
+    public static function get_all_for_form($form_id, $limit = '', $inc_embed = 'exclude', $inc_repeat = 'include')
+    {
+    }
+
+    /**
+     * @param  array<string, mixed>  $values
+     * @return int|false
+     */
+    public static function create($values)
+    {
+    }
+}
+
+class FrmMigrate
+{
+    /**
+     * Creates or updates Formidable's tables. Normally runs on activation; the
+     * test bootstrap calls it explicitly, because it never activates anything.
+     */
+    public function upgrade(): void
+    {
+    }
+}
+
+class FrmXMLHelper
+{
+    /**
+     * Imports a Formidable XML export from a file path.
+     *
+     * Used only by the fixture-parity test, which puts a committed export into
+     * the site and reads it back through the endpoint.
+     *
+     * @param  string  $file
+     * @return array<string, mixed>|WP_Error
+     */
+    public static function import_xml($file)
+    {
+    }
+}
+
+class FrmFormAction
+{
+    /**
+     * The query the plugin uses to select a form's actions. Public, and a
+     * builder rather than a reader, which is why the endpoint calls it: the
+     * post type and the key column stay the plugin's knowledge. Its defaults
+     * are copied here because the endpoint overrides two of them (D-081):
+     * `post_status` pins `publish`, so a draft notification vanishes, and
+     * `$limit` caps at 99.
+     *
+     * @param  int  $form_id  The plugin also takes `'all'` here; nothing in this repo passes it.
+     * @param  int  $limit
+     * @return array{post_type: string, post_status: string, numberposts: int, orderby: string, order: string, menu_order?: int}
+     */
+    public static function action_args($form_id = 0, $limit = 99)
+    {
+    }
+
+    /**
+     * The runtime reader the endpoint deliberately does NOT use, declared so
+     * the test that proves the divergence can call it. Selects published
+     * actions only, drops any whose type is not registered on the serving
+     * site, and merges the type's defaults into each one's settings.
+     *
+     * @param  int|string  $form_id
+     * @param  string  $type  `'all'`, or one action type.
+     * @param  array<string, mixed>  $atts  `limit` and `post_status`, both defaulted inside.
+     * @return array<int, WP_Post>|WP_Post Returns a BARE object when the limit resolves to 1.
+     */
+    public static function get_action_for_form($form_id, $type = 'all', $atts = [])
+    {
+    }
+}
+
+class FrmAppHelper
+{
+    /**
+     * The plugin's own decoder for an action's settings column. Returns the
+     * input unchanged when it is already an array or null, and the original
+     * string when it is neither JSON nor a serialized value it recognizes.
+     *
+     * @param  mixed  $string
+     * @param  bool  $single_to_array
+     * @return mixed
+     */
+    public static function maybe_json_decode($string, $single_to_array = true)
+    {
+    }
+}

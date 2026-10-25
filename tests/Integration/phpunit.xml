@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="bootstrap.php"
+         colors="true"
+         failOnWarning="true"
+         failOnRisky="true"
+         failOnEmptyTestSuite="true"
+         beStrictAboutOutputDuringTests="true">
+    <!--
+        The Integration suite: boots WordPress through wp-phpunit against the test
+        database, on Pest 3 / PHPUnit 11 from this directory's own Composer setup
+        (#375). Paths here are relative to this file. Run it from the repository
+        root with `composer test:integration`; whether it moves to PHPUnit 9.6 is
+        decided on #397.
+    -->
+    <testsuites>
+        <testsuite name="Integration">
+            <directory suffix="Test.php">.</directory>
+            <exclude>./vendor</exclude>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory suffix=".php">../../includes</directory>
+        </include>
+    </source>
+</phpunit>

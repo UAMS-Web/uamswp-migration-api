@@ -1,0 +1,11 @@
+<?php
+
+/**
+ * The ACF Custom Database Tables entry point, for static analysis only.
+ *
+ * Separate from the class stub because a file cannot mix namespaced
+ * declarations with a global-namespace function without brace syntax, and
+ * PHPStan's stub loader wants the conventional form.
+ */
+
+function acf_custom_database_tables(): ?\ACFCustomDatabaseTables\Core {}

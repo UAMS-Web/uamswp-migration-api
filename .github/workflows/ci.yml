@@ -1,0 +1,594 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # Lets the chain be run on demand against a branch, rather than only on a
+  # pull request or a push to main.
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Nothing here writes. Stated rather than inherited, so a job added later starts
+# from read-only instead of from whatever the repository default happens to be.
+permissions:
+  contents: read
+
+# RUN_REMOTE_CI — budget kill-switch (#18).
+# GitHub Actions minutes bill at the *organization* level — one pool shared by
+# every UAMS-Web repo — and only private repos consume them. This repo is
+# private, so every run here spends from the same pool `uams-statamic` draws on.
+# To stop spending until the monthly reset, set an Actions variable
+# `RUN_REMOTE_CI` to `false`; every job below is gated on
+# `if: vars.RUN_REMOTE_CI != 'false'`, so they report `skipped` and consume zero
+# runner minutes. Unset (or any value other than `false`) = CI runs normally —
+# the default is always-on.
+#
+#   - The variable is defined at the ORG level, scoped to private repositories,
+#     so this repo inherits it by carrying the gate; nothing has to be set here.
+#     A REPO variable would override the org value for this repo alone.
+#   - `vars` cannot gate `on:` triggers, only `if:` — the workflow still
+#     evaluates per event, but skipped jobs are never dispatched to a runner.
+#   - `main` is protected by two organization rulesets (no deletion or force
+#     push; pull request required), and neither requires a status check. A
+#     job skipped by its `if:` reports success, so a required check on one of
+#     these jobs would pass without running while this switch is off: it would
+#     gate nothing rather than block anything. See D-090 and D-101.
+#   - While off, the shared local CI runner is the whole gate. That is not a
+#     fallback; it is the normal operating mode for months at a time.
+#
+# PARITY: `local-ci.json` is the job list the shared local CI runner
+# (`.claude/skills/local-ci/local-ci.mjs`, run as `npm run ci:local`) executes
+# against the local toolchain (no Docker, no act, no Actions minutes). The two
+# are hand-maintained mirrors with NO shared source of truth: when you add,
+# remove, or reorder a job here, mirror it there, and vice versa. The
+# parity-critical surface is each job's final run step, flagged inline with
+# `# PARITY:` below:
+#
+#   load-guard -> "Run the no-vendor load guard"
+#   lint-floor -> "Lint every shipped PHP file on the floor"
+#   validate   -> "Run composer validate"
+#   floor-functions -> "Check shipped files for functions the floor lacks"
+#   glyph      -> "Run the glyph audit"
+#   spell      -> "Run cspell"
+#   pint       -> "Determine changed PHP files" + "Run Pint on changed files"
+#   rector     -> "Run Rector (gating profile, dry-run)"
+#   phpstan    -> "Run PHPStan"
+#   pest       -> "Run the Pest suites"
+#   node-test  -> "Run the script tests"
+#
+# JOB CHAIN (cost-ordered): the jobs run as a strict sequential chain via
+# `needs:`, shortest -> longest:
+#
+#   load-guard -> lint-floor -> validate -> floor-functions -> glyph -> spell -> pint -> rector -> phpstan -> pest -> node-test
+#
+# node-test runs LAST despite needing neither Composer nor npm, matching where
+# wordpress-importer's reference implementation places it, ported rather than
+# re-ordered, per #150.
+#
+# So a failure at any step SKIPS (and never bills for) every more expensive step
+# after it. The deliberate trade: a green run's wall-clock is the sum of the
+# jobs rather than the max. `local-ci.json` sets `chain`, so the local run also
+# stops at the first failure.
+#
+# Two deliberate differences in the local run: every job is always selected
+# rather than chosen from the diff, and Pint checks the whole tree rather than
+# the changed files, which is stricter and needs no diff.
+#
+# LOCAL-ONLY (intentionally no job here), each named in `local-ci.json` and in
+# `tests/Unit/CiParityTest.php`:
+#
+#   - `dependencies`: the runner reuses a worktree slot, so this installs from
+#     the commit's locks there, the root setup and the Integration setup in
+#     `tests/Integration` (#375), then reinstalls packages a changed
+#     `tests/Integration/patches.lock.json` patches (#348). Every job here
+#     installs cold.
+#   - `synced-files`: a hand edit to a file the shared sync manages.
+#   - `handed-back-workflow`: `.github/workflows/clear-handed-back.yml`
+#     against the shared template it is copied from.
+#   - `download-archive`: what `git archive` of HEAD holds under the
+#     `.gitattributes` keep-list (#439). The repository is private, so the
+#     `download-archive-check` skill runs it from the local runner.
+#
+# The runner also validates the remote head in a detached slot, hands the run to
+# the branch's own copy of itself when the two differ, refuses untracked
+# residue in `includes/`, `config/`, `scripts/` and `tests/` (#25). None of
+# those has a counterpart here: `actions/checkout` lands the requested ref, and
+# this workflow file, into a fresh checkout every time.
+#
+# Toolchain pin that must also match: PHP 8.4 (setup-php here, `php` in
+# `local-ci.json`). The shared runner pins no Node version. A pre-commit hook
+# (`.githooks/pre-commit`, auto-wired by composer) blocks a commit that stages
+# only one of these two files; bypass with `--no-verify`.
+# `tests/Unit/CiParityTest.php` asserts the surface mechanically.
+# See `.claude/skills/local-ci/SKILL.md` for the job <-> command map.
+#
+# PHP 8.4 FOR THE CHAIN, PHP 8.2 FOR THE FLOOR (#375, superseding D-019's
+# 8.2-everywhere). The unit suite runs on Pest 5, which requires PHP 8.4, and
+# `config.platform.php` is 8.4.1, the oldest PHP every PHPUnit 13 release
+# installs on. Production runs 8.2.30, and no test runs there, so the floor is
+# guarded four ways: Rector's `withPhpVersion` and PHPStan's `phpVersion.min`
+# name 8.2, `lint-floor` parses every shipped PHP file with PHP 8.2 itself, and
+# `floor-functions` asks PHP 8.2 about each call to a function a development
+# polyfill defines, which PHPStan cannot see past when the function is newer
+# than the PHP it runs on (#399).
+# The Integration suite runs from its own Composer setup in `tests/Integration`
+# on Pest 3 / PHPUnit 11, because WordPress' test bootstrap requires
+# `yoast/phpunit-polyfills`, which cannot install beside PHPUnit 13.
+
+jobs:
+  load-guard:
+    name: Load guard (no vendor/ at runtime)
+    runs-on: ubuntu-latest
+    # First (cheapest) link in the cost-ordered chain: every other job runs
+    # downstream via `needs:`, so a failure here skips — and never bills for —
+    # the entire rest of the pipeline.
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    # The plugin keeps a hand-rolled autoloader specifically so it runs on a
+    # stock WordPress install with no Composer artifacts (D-012). A single
+    # `require __DIR__.'/vendor/autoload.php'` breaks that silently: it keeps
+    # working in every development checkout, where vendor/ is always present,
+    # and raises a fatal only in production, where it never is. PR #16 verified the
+    # invariant by hand, once. Dependency-free by construction — the guard uses
+    # PHP's own tokenizer and nothing else, which is what lets it run before any
+    # `composer install` in the chain.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      # PARITY: mirrored by the load-guard job in local-ci.json.
+      - name: Run the no-vendor load guard
+        run: php scripts/check-no-vendor-dependency.php
+
+  lint-floor:
+    name: Floor lint (php -l on PHP 8.2)
+    runs-on: ubuntu-latest
+    # CI chain: runs only after the load guard passes.
+    needs: load-guard
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    # The supported floor is PHP 8.2 and every other job runs on 8.4, so nothing
+    # else here would notice a construct 8.2 cannot parse (#375). tests/ is left
+    # out: the suites run only on the development PHP and may use its syntax.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      # PARITY: mirrored by the lint-floor job in local-ci.json, whose `each`
+      # globs select the same tracked files.
+      - name: Lint every shipped PHP file on the floor
+        run: git ls-files -z -- '*.php' ':!:vendor/**' ':!:tests/**' ':!:node_modules/**' | xargs -0 -n1 php -l
+
+  validate:
+    name: Composer validate (composer.lock freshness)
+    runs-on: ubuntu-latest
+    # CI chain: runs only after the floor lint passes.
+    needs: lint-floor
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    # Fails when composer.lock no longer matches composer.json — the content-hash
+    # drift a composer.json edit leaves behind when the lock is not refreshed.
+    # Nothing breaks outright, but every `composer install` on every machine then
+    # warns "The lock file is not up to date with the latest changes in
+    # composer.json" forever, and warning noise is how real warnings get ignored.
+    # Dependency-free: Composer reads the two files directly, so this needs no
+    # install of its own.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+
+      # `--no-check-publish --no-check-all` scope this to the checks that apply
+      # to a plugin rather than a published package. They do not change pass/fail
+      # — warnings only fail under `--strict` — they change the OUTPUT, dropping
+      # publish-readiness advice against a package that is never published and is
+      # deleted when the migration completes (D-003). Deliberately NOT
+      # `--strict`: it exits non-zero on a clean checkout over warnings this
+      # repo has settled.
+      # PARITY: mirrored by the validate job in local-ci.json.
+      - name: Run composer validate
+        run: composer validate --no-check-publish --no-check-all
+
+  floor-functions:
+    name: Floor functions (polyfilled calls on PHP 8.2)
+    runs-on: ubuntu-latest
+    # CI chain: runs only after composer validate passes, so it installs from a
+    # lock that matches composer.json.
+    needs: validate
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    # A function newer than PHP 8.4 that a polyfill in vendor/ defines passes
+    # PHPStan, and the plugin ships no vendor/ (D-012), so on the floor the call
+    # is fatal (#399). The guard reads the polyfills as text, so it needs them
+    # installed but never loads them; --no-plugins and --no-scripts keep
+    # Composer from running dev tooling that needs PHP 8.4.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install Composer dependencies without running them
+        run: composer install --no-interaction --no-progress --prefer-dist --no-plugins --no-scripts
+
+      # PARITY: mirrored by the floor-functions job in local-ci.json.
+      - name: Check shipped files for functions the floor lacks
+        run: php scripts/check-floor-functions.php
+
+  glyph:
+    name: Glyph audit (no emoji in durable records)
+    runs-on: ubuntu-latest
+    # CI chain: runs only after the floor-functions guard passes.
+    needs: floor-functions
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    # `.claude/rules/no-emoji-in-durable-records.md` bans glyphs from durable
+    # prose and ships a working audit; until #117 nothing ran it. cspell checks
+    # WORDS, not pictographs, so the spell job's silence was the whole of the
+    # gate's opinion on a glyph and a PR adding one passed green.
+    #
+    # Placed ahead of spell rather than beside it: this needs no `npm ci`, only
+    # Node itself, so cost-ordering puts it on the cheaper side of the install.
+    #
+    # The script reads its expression AND its scope out of the rule instead of
+    # restating either, and asserts both control arms before it reports — an
+    # audit that cannot match and an audit over clean prose produce identical
+    # empty output, so a job claiming "no glyphs" without proving it can find
+    # one is worse than no job at all.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # No `npm ci`: every import in the script resolves to a node: builtin.
+      # PARITY: mirrored by the glyph job in local-ci.json.
+      - name: Run the glyph audit
+        run: node scripts/check-no-glyphs.mjs
+
+  spell:
+    name: Spell check (cspell)
+    runs-on: ubuntu-latest
+    # CI chain: runs only after the glyph audit passes.
+    needs: glyph
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    # A blocking gate, not advisory. The dictionary is clean, and cspell was
+    # already red on `main` for two merges before #7 noticed — precisely because
+    # it sat outside `composer ci` with nothing running it. Framework-free: Node
+    # and the cspell CLI, no PHP or Composer.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      # PARITY: mirrored by the spell job in local-ci.json.
+      - name: Run cspell
+        run: npm run spell
+
+  pint:
+    name: Pint (changed files)
+    runs-on: ubuntu-latest
+    # CI chain: runs only after the spell check passes. Pint MUST come before
+    # Rector — the two rewrite the same files, and rector.php leaves import
+    # removal to Pint alone.
+    needs: spell
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The changed-file diff below resolves the base ref, so the full
+          # history has to be present.
+          fetch-depth: 0
+
+      - name: Set up PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+
+      - name: Determine Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config --global cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # PARITY: mirrored by the pint job in local-ci.json, which checks the
+      # whole tree rather than this diff-filter=ACMR list of changed files.
+      - name: Determine changed PHP files
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="origin/${{ github.base_ref }}"
+          else
+            base="HEAD~1"
+          fi
+          files=$(git diff --name-only --diff-filter=ACMR "$base"...HEAD -- '*.php' | tr '\n' ' ')
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+          echo "Changed PHP files: ${files:-<none>}"
+
+      # PARITY: mirrored by the pint job in local-ci.json. The list goes as one
+      # argv: the host allows a command line in the megabytes and this repo is a
+      # few dozen PHP files, so it does not chunk.
+      - name: Run Pint on changed files
+        if: steps.changed.outputs.files != ''
+        run: vendor/bin/pint --test ${{ steps.changed.outputs.files }}
+
+      - name: Skip notice
+        if: steps.changed.outputs.files == ''
+        run: echo "No PHP files changed in this PR/push; skipping Pint."
+
+  rector:
+    name: Rector (gating profile)
+    runs-on: ubuntu-latest
+    # CI chain: runs only after Pint passes.
+    needs: pint
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+
+      - name: Determine Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config --global cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # PARITY: mirrored by the rector job in local-ci.json (same gating
+      # profile, same --dry-run). Locally the slot is reused, so that job passes
+      # --clear-cache to start cold as this step does.
+      #
+      # Rector's file cache does NOT key on the active rule set, so a warm cache
+      # written by the sweep profile makes a later gating run silently
+      # UNDER-report, and under-reporting is a false GREEN. This repo carries two
+      # profiles over one rule corpus (rector.php and rector-sweep.php), so since
+      # #366 rector.php gives each profile its own cache directory under
+      # `sys_get_temp_dir()`. The private temp dir here is kept as the second
+      # guard it always was: a fresh dir starts empty, so no `--clear-cache`,
+      # which would race a concurrent Rector, is needed.
+      # PHP reads TMPDIR on Linux; TMP/TEMP are set too so the one command is
+      # portable.
+      - name: Run Rector (gating profile, dry-run)
+        run: |
+          RECTOR_TMP="$(mktemp -d)"
+          TMPDIR="$RECTOR_TMP" TMP="$RECTOR_TMP" TEMP="$RECTOR_TMP" \
+            vendor/bin/rector --dry-run --no-progress-bar
+
+  phpstan:
+    name: PHPStan (level max)
+    runs-on: ubuntu-latest
+    # CI chain: runs only after Rector passes.
+    needs: rector
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+
+      - name: Determine Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config --global cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # PARITY: mirrored by the phpstan job in local-ci.json. `level: max`
+      # with bleedingEdge; phpstan.neon.dist supplies the paths, the WordPress
+      # stubs and the 8.2 `phpVersion` floor.
+      - name: Run PHPStan
+        run: composer stan
+
+  pest:
+    name: Pest (Unit + Integration)
+    runs-on: ubuntu-latest
+    # CI chain: runs LAST — the only job needing a database and a WordPress
+    # tree, so everything cheaper gates it.
+    needs: phpstan
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    # The Integration suite boots real WordPress through `wp-phpunit` (D-021) against
+    # a real MySQL, and installs a real network — `WP_TESTS_MULTISITE` is on
+    # because every endpoint is site-scoped and the switch branch never executes
+    # on a single site. So this job needs both a database service and a
+    # WordPress tree, which is what makes it the expensive tail of the chain.
+    services:
+      mysql:
+        # The database is created empty and thrown away with the runner. The
+        # test installer DROPS EVERY TABLE it finds, which is why
+        # tests/Integration/bootstrap.php refuses to run against the working install's
+        # database — irrelevant here, load-bearing locally.
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: uamswp_migration_api_tests
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          # WordPress talks to MySQL through mysqli; nothing else here needs an
+          # extension setup-php does not already enable.
+          extensions: mysqli
+          coverage: none
+          tools: composer:v2
+
+      - name: Determine Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config --global cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock', 'tests/Integration/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # The Integration suite's own setup (#375): Pest 3 / PHPUnit 11, the
+      # polyfills and wp-phpunit, which cannot install beside the root's Pest 5.
+      - name: Install the Integration suite's Composer dependencies
+        run: composer install --working-dir=tests/Integration --no-interaction --no-progress --prefer-dist
+
+      # `wp-phpunit` ships WordPress' test suite, not WordPress itself, and the
+      # two are released in lockstep — so the core version is READ FROM THE LOCK
+      # rather than pinned here, where it would drift the moment the package is
+      # updated. wordpress.org publishes a dot-zero release without the trailing
+      # `.0` (`wordpress-6.8.tar.gz`, never `wordpress-6.8.0.tar.gz`).
+      - name: Resolve the WordPress version wp-phpunit pins
+        id: wordpress
+        run: |
+          version=$(jq -r '.["packages-dev"][] | select(.name == "wp-phpunit/wp-phpunit") | .version' tests/Integration/composer.lock)
+          if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "Could not read wp-phpunit/wp-phpunit from tests/Integration/composer.lock." >&2
+            exit 1
+          fi
+          echo "slug=${version%.0}" >> "$GITHUB_OUTPUT"
+          echo "WordPress ${version%.0} (wp-phpunit $version)"
+
+      - name: Download WordPress ${{ steps.wordpress.outputs.slug }}
+        run: |
+          curl -sSfL "https://wordpress.org/wordpress-${{ steps.wordpress.outputs.slug }}.tar.gz" \
+            -o "$RUNNER_TEMP/wordpress.tar.gz"
+          tar -xzf "$RUNNER_TEMP/wordpress.tar.gz" -C "$RUNNER_TEMP"
+
+      - name: Wait for MySQL
+        run: |
+          for _ in $(seq 1 30); do
+            if mysqladmin ping -h 127.0.0.1 -P 3306 -u root --silent; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "MySQL did not become available." >&2
+          exit 1
+
+      # PARITY: mirrored by the pest job in local-ci.json.
+      #
+      # `composer test` is the three-process chain: Unit (no WordPress, from the
+      # root setup), Integration (WordPress + database, from tests/Integration),
+      # and the shared-secret re-run. The third exists
+      # because `UAMSWP_MIGRATION_API_SECRET` is a CONSTANT — it cannot be
+      # undefined once set — so the "no secret configured" branch and the "secret
+      # configured" branch each need their own process.
+      #
+      # Only WP_TESTS_ABSPATH is set. Every other WP_TESTS_* value in
+      # tests/Integration/wp-tests-config.php already defaults to what this job provides
+      # (127.0.0.1, root, empty password, uamswp_migration_api_tests); ABSPATH is
+      # the one that cannot, because it is normally LOCATED — five levels up from
+      # tests/Integration/, which is true in a wp-content/plugins/ checkout and false here.
+      - name: Run the Pest suites
+        env:
+          WP_TESTS_ABSPATH: ${{ runner.temp }}/wordpress
+        run: composer test
+
+  node-test:
+    name: Node tests
+    runs-on: ubuntu-latest
+    # CI chain: runs last, after pest -- ported from wordpress-importer's
+    # reference implementation as-is rather than re-ordered by cost, per #150.
+    needs: pest
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # Deliberately no `npm ci` and no `cache: npm`. Every import in
+      # scripts/*.test.mjs, and every import those modules pull in
+      # transitively, resolves to a `node:` builtin or a further first-party
+      # relative module -- no bare package name anywhere in the chain, so this
+      # job needs Node and nothing else.
+      #
+      # The glob is quoted so Node expands it rather than the shell: `node --test`
+      # accepts a pattern directly since v22, and an unquoted glob would resolve
+      # differently between the runner's shell and a Windows spawn. A bare
+      # directory argument does NOT work -- `node --test scripts/` fails with
+      # "Cannot find module .../scripts", measured on v22.22.3.
+      # PARITY: mirrored by the node-test job in local-ci.json.
+      - name: Run the script tests
+        run: node --test "scripts/*.test.mjs"

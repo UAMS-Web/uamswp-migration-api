@@ -1,0 +1,37 @@
+--- a/src/MutationTest.php
++++ b/src/MutationTest.php
+@@ -86,7 +86,13 @@
+             command: [
+                 ...$originalArguments,
+                 '--bail',
+-                '--filter="'.implode('|', $filters).'"',
++                // No literal quotes: this element is passed as one argv entry, so quoting it is
++                // the Process's job. On POSIX the quotes reached PHPUnit, which happened to read
++                // a value starting with `"` as a `"`-delimited regex. On Windows argv[0] is a
++                // batch launcher, and cmd.exe's re-parse leaves the `|` between two or more test
++                // names bare -- it pipes, the child exits without running a test, and
++                // hasFinished() scores it killed. See #296.
++                '--filter='.implode('|', $filters),
+             ],
+             env: $envs,
+             timeout: $this->calculateTimeout(),
+--- a/src/Support/StreamWrapper.php
++++ b/src/Support/StreamWrapper.php
+@@ -179,7 +179,16 @@
+ 
+     public function stream_lock(int $operation): bool
+     {
+-        return flock($this->resource, LOCK_SH);
++        // Honor the requested operation. Always taking LOCK_SH made every LOCK_EX write in a
++        // mutant child fail on Windows, where flock() is a mandatory byte-range lock and a
++        // shared lock denies writes even through the handle holding it. PHP first calls this
++        // with 0 to ask whether the stream supports locking, which flock() rejects, so answer
++        // that probe directly. See #296.
++        if ($operation === 0) {
++            return true;
++        }
++
++        return flock($this->resource, $operation);
+     }
+ 
+     public function stream_metadata(string $path, int $option, mixed $value): bool

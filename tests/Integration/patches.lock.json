@@ -1,0 +1,27 @@
+{
+    "_hash": "144fb96bb6f2e22200afa21bbed7bd7846b6ff0b7d31c91c8d2db670b300efc3",
+    "patches": {
+        "pestphp/pest-plugin-mutate": [
+            {
+                "package": "pestphp/pest-plugin-mutate",
+                "description": "Let a mutant child on Windows run its tests and write files, so its failure is a real kill (temporary; see #296)",
+                "url": "../../patches/pest-plugin-mutate-windows-mutant-child.patch",
+                "sha256": "ee00e4bea6f5b8491b59d823226b6f1bb414896a893597f6b067b778e1e2ee7b",
+                "depth": 1,
+                "extra": {
+                    "provenance": "root"
+                }
+            },
+            {
+                "package": "pestphp/pest-plugin-mutate",
+                "description": "Widen or refuse a Windows mutant child's filter that would pass cmd.exe's command-line limit, so it cannot score a kill without running a test (temporary; see #313)",
+                "url": "../../patches/pest-plugin-mutate-windows-filter-length.patch",
+                "sha256": "491bae83be6fe6e498fc24305c6a021d134d46b0ff7dc3a0b5b4382205b78a0f",
+                "depth": 1,
+                "extra": {
+                    "provenance": "root"
+                }
+            }
+        ]
+    }
+}

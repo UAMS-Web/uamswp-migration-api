@@ -1,0 +1,60 @@
+<?php
+
+/**
+ * Class signatures for ACF Custom Database Tables, for static analysis only.
+ *
+ * A stub rather than `scanDirectories`: the plugin is paid, is not a Composer
+ * package, and is absent on CI, so pointing the analyzer at its directory would
+ * red every remote run. Only the surface
+ * `tests/Integration/Feature/ACF/CustomTableDivergenceTest.php` touches is declared — this
+ * is not a mirror of the plugin and should not grow into one.
+ *
+ * The bodies are empty; PHPStan reads signatures from a stub and never runs it.
+ * Return types are `mixed` where the real ones are `array|WP_Error`, because a
+ * stub cannot see WordPress' symbols and the test ignores those values anyway.
+ */
+
+namespace ACFCustomDatabaseTables;
+
+/**
+ * @implements \ArrayAccess<string, mixed>
+ */
+class Container implements \ArrayAccess
+{
+    public function offsetExists(mixed $offset): bool {}
+
+    public function offsetGet(mixed $offset): mixed {}
+
+    public function offsetSet(mixed $offset, mixed $value): void {}
+
+    public function offsetUnset(mixed $offset): void {}
+}
+
+class Core
+{
+    public function __get_container(): Container {}
+}
+
+namespace ACFCustomDatabaseTables\Coordinator;
+
+class TableCreationCoordinator
+{
+    public function update_tables(): mixed {}
+
+    public function rebuild_map_cache(): mixed {}
+}
+
+class TableCoordinator
+{
+    public function fetch_map_from_cache(): mixed {}
+}
+
+namespace ACFCustomDatabaseTables\Data;
+
+class TableMap
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function get_map(): array {}
+}

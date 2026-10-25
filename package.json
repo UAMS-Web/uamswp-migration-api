@@ -1,0 +1,12 @@
+{
+    "name": "uamswp-migration-api",
+    "private": true,
+    "scripts": {
+        "spell": "cspell --no-progress --dot \"**/*.{php,js,mjs,md,yml,yaml,json}\" \".github/**\"",
+        "ci:local": "node scripts/ci-local.mjs"
+    },
+    "devDependencies": {
+        "acorn": "^8.19.0",
+        "cspell": "^10.4.0"
+    }
+}

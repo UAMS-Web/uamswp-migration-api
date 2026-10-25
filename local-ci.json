@@ -1,0 +1,114 @@
+{
+  "_note": "The shared local CI runner's job list for this repository (#366). Every job is always selected, as the private runner it replaces ran every job on every run, and chain stops at the first failure, as ci.yml's needs: chain does. tests/Unit/CiParityTest.php holds the job order against ci.yml.",
+  "_prepare": "patches is off: prepare runs before any job, so it would reinstall the slot's old package versions against the commit's patches. The dependencies job installs first and re-syncs patches second, as the private runner did.",
+  "base": "main",
+  "php": "8.4",
+  "chain": true,
+  "prepare": {
+    "residue": ["includes", "config", "scripts", "tests"],
+    "patches": false
+  },
+  "jobs": [
+    {
+      "name": "dependencies",
+      "_note": "Local only. Installs the root setup and the Integration setup (tests/Integration) from their locks in the runner's own slot, and refuses a stale tree anywhere else; see scripts/prepare-dependencies.mjs.",
+      "run": "node scripts/prepare-dependencies.mjs",
+      "always": true,
+      "requires": ["bin:node"]
+    },
+    {
+      "name": "load-guard",
+      "run": "php scripts/check-no-vendor-dependency.php",
+      "always": true
+    },
+    {
+      "name": "lint-floor",
+      "_note": "Parses every shipped PHP file with the supported floor, PHP 8.2, which no test runs on (#375). tests/ is left out: the suites run only on the development PHP and may use its syntax.",
+      "run": "php -l",
+      "php": "8.2",
+      "each": ["**/*.php", "!vendor/**", "!tests/**", "!node_modules/**"],
+      "always": true
+    },
+    {
+      "name": "validate",
+      "run": "composer validate --no-check-publish --no-check-all",
+      "always": true,
+      "requires": ["bin:composer"]
+    },
+    {
+      "name": "floor-functions",
+      "_note": "Asks PHP 8.2 about each call in a shipped file to a function a development polyfill defines; PHPStan cannot see past a polyfill for a function newer than the PHP it runs on (#399). Reads the polyfills the dependencies job installed.",
+      "run": "php scripts/check-floor-functions.php",
+      "php": "8.2",
+      "always": true
+    },
+    {
+      "name": "glyph",
+      "run": "node scripts/check-no-glyphs.mjs",
+      "always": true,
+      "requires": ["bin:node"]
+    },
+    {
+      "name": "synced-files",
+      "_note": "Local only. A hand edit to a file the shared sync manages fails the run.",
+      "run": "node .claude/skills/synced-files/scripts/check-synced-files.mjs",
+      "always": true,
+      "requires": ["bin:node"]
+    },
+    {
+      "name": "handed-back-workflow",
+      "_note": "Local only. Fails when .github/workflows/clear-handed-back.yml differs from the shared template or is missing.",
+      "run": "node .claude/skills/handed-back-label/scripts/check-handed-back-workflow.mjs",
+      "always": true,
+      "requires": ["bin:node"]
+    },
+    {
+      "name": "download-archive",
+      "_note": "Local only. Lists `git archive` of HEAD under the working tree's .gitattributes and fails naming anything the plugin does not run (#439). Always, because a new top-level path anywhere can break it.",
+      "run": "node .claude/skills/download-archive-check/check-download-archive.mjs",
+      "always": true,
+      "requires": ["bin:node", "bin:git"]
+    },
+    {
+      "name": "spell",
+      "_note": "No node_modules requirement: the runner checks requires before any job runs, so one would skip this job in a slot the dependencies job has not yet filled. An absent tree fails instead.",
+      "run": "npm run spell",
+      "always": true,
+      "requires": ["bin:npm"]
+    },
+    {
+      "name": "pint",
+      "run": "vendor/bin/pint --test",
+      "always": true
+    },
+    {
+      "name": "rector",
+      "_note": "--clear-cache: the slot is reused, and Rector skips any file whose content is unchanged, so a warm cache could hide a rule that a change elsewhere now fires. ci.yml runs cold in a fresh temp dir. The runner's single-flight lock means no concurrent Rector shares this slot's cache.",
+      "run": "vendor/bin/rector --dry-run --no-progress-bar --clear-cache",
+      "always": true
+    },
+    {
+      "name": "phpstan",
+      "run": "vendor/bin/phpstan analyze --no-progress --memory-limit=2G",
+      "always": true
+    },
+    {
+      "name": "pest",
+      "_note": "The unit suite from the root setup, then the Integration suite from tests/Integration twice (once with the shared secret defined). See scripts/run-pest-suites.php.",
+      "run": "php scripts/run-pest-suites.php",
+      "always": true,
+      "database": {
+        "name": "uamswp_migration_api_ci",
+        "env": "WP_TESTS_DB_NAME",
+        "lock": { "prefix": "uamswp-migration-api-ci", "heldEnv": "LOCAL_CI_SUITE_LOCK_HELD" }
+      }
+    },
+    {
+      "name": "node-test",
+      "run": "node --test",
+      "each": ["scripts/*.test.mjs"],
+      "always": true,
+      "requires": ["bin:node"]
+    }
+  ]
+}
