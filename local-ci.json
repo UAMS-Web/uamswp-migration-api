@@ -50,21 +50,21 @@
     },
     {
       "name": "synced-files",
-      "_note": "Local only. A hand edit to a file the shared sync manages fails the run.",
+      "_note": "A hand edit to a file the shared sync manages fails the run. ci.yml runs it too, since #10.",
       "run": "node .claude/skills/synced-files/scripts/check-synced-files.mjs",
       "always": true,
       "requires": ["bin:node"]
     },
     {
       "name": "handed-back-workflow",
-      "_note": "Local only. Fails when .github/workflows/clear-handed-back.yml differs from the shared template or is missing.",
+      "_note": "Fails when .github/workflows/clear-handed-back.yml differs from the shared template or is missing. ci.yml runs it too, since #10.",
       "run": "node .claude/skills/handed-back-label/scripts/check-handed-back-workflow.mjs",
       "always": true,
       "requires": ["bin:node"]
     },
     {
       "name": "download-archive",
-      "_note": "Local only. Lists `git archive` of HEAD under the working tree's .gitattributes and fails naming anything the plugin does not run (#439). Always, because a new top-level path anywhere can break it.",
+      "_note": "Lists `git archive` of HEAD under the working tree's .gitattributes and fails naming anything the plugin does not run (#439). Always, because a new top-level path anywhere can break it. ci.yml runs it too, since #10.",
       "run": "node .claude/skills/download-archive-check/check-download-archive.mjs",
       "always": true,
       "requires": ["bin:node", "bin:git"]

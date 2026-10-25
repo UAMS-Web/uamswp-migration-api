@@ -59,6 +59,9 @@ permissions:
 #   validate   -> "Run composer validate"
 #   floor-functions -> "Check shipped files for functions the floor lacks"
 #   glyph      -> "Run the glyph audit"
+#   synced-files -> "Check the synced files against the manifest"
+#   handed-back-workflow -> "Check the handed-back workflow against its template"
+#   download-archive -> "Check what the GitHub download holds"
 #   spell      -> "Run cspell"
 #   pint       -> "Determine changed PHP files" + "Run Pint on changed files"
 #   rector     -> "Run Rector (gating profile, dry-run)"
@@ -69,7 +72,7 @@ permissions:
 # JOB CHAIN (cost-ordered): the jobs run as a strict sequential chain via
 # `needs:`, shortest -> longest:
 #
-#   load-guard -> lint-floor -> validate -> floor-functions -> glyph -> spell -> pint -> rector -> phpstan -> pest -> node-test
+#   load-guard -> lint-floor -> validate -> floor-functions -> glyph -> synced-files -> handed-back-workflow -> download-archive -> spell -> pint -> rector -> phpstan -> pest -> node-test
 #
 # node-test runs LAST despite needing neither Composer nor npm, matching where
 # wordpress-importer's reference implementation places it, ported rather than
@@ -84,7 +87,7 @@ permissions:
 # rather than chosen from the diff, and Pint checks the whole tree rather than
 # the changed files, which is stricter and needs no diff.
 #
-# LOCAL-ONLY (intentionally no job here), each named in `local-ci.json` and in
+# LOCAL-ONLY (intentionally no job here), named in `local-ci.json` and in
 # `tests/Unit/CiParityTest.php`:
 #
 #   - `dependencies`: the runner reuses a worktree slot, so this installs from
@@ -92,11 +95,10 @@ permissions:
 #     `tests/Integration` (#375), then reinstalls packages a changed
 #     `tests/Integration/patches.lock.json` patches (#348). Every job here
 #     installs cold.
-#   - `synced-files`: a hand edit to a file the shared sync manages.
-#   - `handed-back-workflow`: `.github/workflows/clear-handed-back.yml`
-#     against the shared template it is copied from.
-#   - `download-archive`: what `git archive` of HEAD holds under the
-#     `.gitattributes` keep-list (#439), run from the local runner.
+#
+# `synced-files`, `handed-back-workflow` and `download-archive` were local-only
+# until #10. The local chain stopped gating a merge with D-105, so each now runs
+# here too, where `CI` requires it.
 #
 # The runner also validates the remote head in a detached slot, hands the run to
 # the branch's own copy of itself when the two differ, refuses untracked
@@ -276,11 +278,80 @@ jobs:
       - name: Run the glyph audit
         run: node scripts/check-no-glyphs.mjs
 
-  spell:
-    name: Spell check (cspell)
+  synced-files:
+    name: Synced files (match the sync manifest)
     runs-on: ubuntu-latest
     # CI chain: runs only after the glyph audit passes.
     needs: glyph
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    # A hand edit to a rule or skill the shared sync manages fails here: the
+    # file's sha256 no longer matches `.claude/sync-manifest.jsonc`. Line
+    # endings are normalized before hashing.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # No `npm ci`: every import in the script resolves to a node: builtin.
+      # PARITY: mirrored by the synced-files job in local-ci.json.
+      - name: Check the synced files against the manifest
+        run: node .claude/skills/synced-files/scripts/check-synced-files.mjs
+
+  handed-back-workflow:
+    name: Handed-back workflow (matches its template)
+    runs-on: ubuntu-latest
+    # CI chain: runs only after the synced-files check passes.
+    needs: synced-files
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    # `.github/workflows/clear-handed-back.yml` is copied from the
+    # handed-back-label skill's template; this fails when the copy differs or is
+    # missing (UAMS-Web/uams-claude-skills#57).
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # No `npm ci`: every import in the script resolves to a node: builtin.
+      # PARITY: mirrored by the handed-back-workflow job in local-ci.json.
+      - name: Check the handed-back workflow against its template
+        run: node .claude/skills/handed-back-label/scripts/check-handed-back-workflow.mjs
+
+  download-archive:
+    name: Download archive (only what the plugin runs)
+    runs-on: ubuntu-latest
+    # CI chain: runs only after the handed-back workflow check passes.
+    needs: handed-back-workflow
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    # Lists `git archive` of HEAD under the `.gitattributes` keep-list and fails
+    # naming anything the plugin does not run (#439). A public repository runs
+    # it from Actions, per `.claude/rules/keep-the-download-to-what-runs.md`.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # No `npm ci`: every import in the script resolves to a node: builtin.
+      # PARITY: mirrored by the download-archive job in local-ci.json.
+      - name: Check what the GitHub download holds
+        run: node .claude/skills/download-archive-check/check-download-archive.mjs
+
+  spell:
+    name: Spell check (cspell)
+    runs-on: ubuntu-latest
+    # CI chain: runs only after the download-archive check passes.
+    needs: download-archive
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
     if: vars.RUN_REMOTE_CI != 'false'
     # A blocking gate, not advisory. The dictionary is clean, and cspell was
@@ -610,6 +681,9 @@ jobs:
       - validate
       - floor-functions
       - glyph
+      - synced-files
+      - handed-back-workflow
+      - download-archive
       - spell
       - pint
       - rector
