@@ -533,10 +533,11 @@ jobs:
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
     if: vars.RUN_REMOTE_CI != 'false'
     # The Integration suite boots real WordPress through `wp-phpunit` (D-021) against
-    # a real MySQL, and installs a real network — `WP_TESTS_MULTISITE` is on
-    # because every endpoint is site-scoped and the switch branch never executes
-    # on a single site. So this job needs both a database service and a
-    # WordPress tree, which is what makes it the expensive tail of the chain.
+    # a real MySQL, and installs it twice: as a network, because every endpoint
+    # is site-scoped and the switch branch only executes there, and as a single
+    # site, where the token lands in `wp_options` and `?site=` is refused (#14).
+    # So this job needs both a database service and a WordPress tree, which is
+    # what makes it the expensive tail of the chain.
     services:
       mysql:
         # The database is created empty and thrown away with the runner. The
@@ -621,12 +622,12 @@ jobs:
 
       # PARITY: mirrored by the pest job in local-ci.json.
       #
-      # `composer test` is the three-process chain: Unit (no WordPress, from the
+      # `composer test` is the five-process chain: Unit (no WordPress, from the
       # root setup), Integration (WordPress + database, from tests/Integration),
-      # and the shared-secret re-run. The third exists
-      # because `UAMSWP_MIGRATION_API_SECRET` is a CONSTANT — it cannot be
-      # undefined once set — so the "no secret configured" branch and the "secret
-      # configured" branch each need their own process.
+      # the shared-secret re-run, and both Integration processes again on a
+      # single site. `UAMSWP_MIGRATION_API_SECRET` and `MULTISITE` are CONSTANTS,
+      # which cannot be undefined once set, so each secret state on each install
+      # shape needs its own process.
       #
       # Only WP_TESTS_ABSPATH is set. Every other WP_TESTS_* value in
       # tests/Integration/wp-tests-config.php already defaults to what this job provides

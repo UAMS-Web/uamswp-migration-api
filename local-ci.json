@@ -94,7 +94,7 @@
     },
     {
       "name": "pest",
-      "_note": "The unit suite from the root setup, then the Integration suite from tests/Integration twice (once with the shared secret defined). See scripts/run-pest-suites.php.",
+      "_note": "The unit suite from the root setup, then the Integration suite from tests/Integration four times: as a network and as a single site, each once without and once with the shared secret defined. See scripts/run-pest-suites.php.",
       "run": "php scripts/run-pest-suites.php",
       "always": true,
       "database": {

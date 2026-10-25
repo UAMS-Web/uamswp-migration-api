@@ -321,7 +321,7 @@ it('serves registrations for the site that booted the request', function (): voi
     expect(discoveryGet('/post-types')->get_status())->toBe(200)
         ->and(discoveryGet('/post-types', ['site' => $current])->get_status())->toBe(200)
         ->and(discoveryGet('/taxonomies', ['site' => $current])->get_status())->toBe(200);
-});
+})->skip(! is_multisite(), networkOnly('a single site refuses every `?site=`'));
 
 it('serves counts for another site on `/sites`, where switching genuinely works', function (): void {
     // The contrast that makes the refusal above coherent rather than arbitrary:

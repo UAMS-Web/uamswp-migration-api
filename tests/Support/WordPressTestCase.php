@@ -110,7 +110,22 @@ abstract class WordPressTestCase extends WP_UnitTestCase
 
         Config::flush();
 
-        global $wp_rest_server;
+        /*
+         * Keep a database error off standard output on a single site too.
+         *
+         * `WP_UnitTestCase` turns `$wpdb->show_errors` on for every class. On a
+         * network `wpdb::print_error()` then writes only to a log file named by a
+         * constant this suite never defines; on a single site it prints an HTML
+         * `<div>`, and Pest's renderer fails on the class that markup carries
+         * (`Style [...] not found`), ending the run. A test that provokes a query
+         * failure on purpose reads `$wpdb->last_error`, which is set before
+         * printing is considered, so hiding the output changes no assertion.
+         */
+        global $wpdb, $wp_rest_server;
+
+        if (! is_multisite() && $wpdb instanceof \wpdb) {
+            $wpdb->hide_errors();
+        }
 
         $wp_rest_server = new WP_REST_Server;
         do_action('rest_api_init', $wp_rest_server);

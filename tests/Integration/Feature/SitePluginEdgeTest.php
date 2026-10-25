@@ -100,7 +100,7 @@ describe('Site', function (): void {
         'not a number' => ['abc'],
         'negative' => [-3],
         'zero as a string' => ['0'],
-    ]);
+    ])->skip(! is_multisite(), networkOnly('a single site refuses every `?site=` before reading its value'));
 
     it('passes on an answer another filter gave first, without switching', function (): void {
         $original = get_current_blog_id();

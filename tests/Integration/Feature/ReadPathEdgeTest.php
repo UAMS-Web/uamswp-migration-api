@@ -234,7 +234,7 @@ describe('terms', function (): void {
             ->and($withSite->get_status())->toBe(404)
             ->and(errorCode($withSite))->toBe('uamswp_migration_api_taxonomy_not_registered_here')
             ->and($message($withSite))->toBe("`uamswp_never_registered_tax` is served by this deployment but is not registered in the process handling this request. Request it from site {$site}'s own REST root.");
-    });
+    })->skip(! is_multisite(), networkOnly('a single site refuses every `?site=`'));
 });
 
 describe('authors', function (): void {

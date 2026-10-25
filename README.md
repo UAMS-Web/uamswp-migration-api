@@ -123,9 +123,10 @@ That is the whole setup. WordPress is located from this checkout's own position 
 
 | Command | What it runs |
 | --- | --- |
-| `composer test` | Both suites, then the shared-secret process |
+| `composer test` | Both suites, then the shared-secret process, then the suite that boots WordPress and the shared-secret process again on a single site |
 | `composer test:unit` | Only the WordPress-free suite |
-| `composer test:integration` | Only the suite that boots WordPress |
+| `composer test:integration` | Only the suite that boots WordPress, as a network |
+| `composer test:integration:single-site` | The same suite, as a single-site install |
 | `composer mutate` | Mutation testing over the pure-logic classes |
 | `composer ci` | PHPStan, Pint, then all of the above |
 

@@ -15,10 +15,12 @@ use UAMSWP\MigrationAPI\Token;
  * invalid submission do, and what the page says about the current and previous
  * token. The page renders straight to output, so each test captures it.
  *
- * **This suite runs as multisite, so the single-site branches are not reached.**
- * `register()` and `addPage()` choose `admin_menu` and `add_options_page()` when
- * `is_multisite()` is false, and `is_multisite()` reads a constant fixed for the
- * process (see `TokenStorageTest.php`). Those two lines stay unexercised here.
+ * **The network branches are tested here, and the single-site ones in
+ * `SingleSiteTest.php`.** `register()` and `addPage()` choose `admin_menu` and
+ * `add_options_page()` when `is_multisite()` is false, and `is_multisite()` reads
+ * a constant fixed for the process, so the suite runs once as each install
+ * shape (#14). The three tests here that only a network can satisfy skip in the
+ * single-site process.
  *
  * **Checked by hand-applied mutations, not `--mutate`.** `Plugin::boot()` calls
  * `TokenPage::register()` during the test bootstrap, so the class is loaded
@@ -85,7 +87,7 @@ it('registers on the network admin menu on a multisite install', function (): vo
 
     expect(has_action('network_admin_menu', [TokenPage::class, 'addPage']))->toBe(10)
         ->and(has_action('admin_menu', [TokenPage::class, 'addPage']))->toBeFalse();
-});
+})->skip(! is_multisite(), networkOnly('the page registers on the network admin menu only on a network'));
 
 it('adds the page under network settings, gated on the capability the API reads', function (): void {
     actAsSuperAdmin();
@@ -100,7 +102,7 @@ it('adds the page under network settings, gated on the capability the API reads'
         ->and(\is_array($entry) ? $entry[0] : null)->toBe('Migration API token')
         ->and(\is_array($entry) ? $entry[1] : null)->toBe(Auth::capability())
         ->and(Auth::capability())->toBe('manage_network_options');
-});
+})->skip(! is_multisite(), networkOnly('the page sits under network settings only on a network'));
 
 it('refuses a user without the capability with a 403 and issues nothing', function (): void {
     actAs('administrator');
@@ -114,7 +116,7 @@ it('refuses a user without the capability with a 403 and issues nothing', functi
     }
 
     expect(Token::record())->toBeNull();
-});
+})->skip(! is_multisite(), networkOnly('a site administrator lacks the capability only on a network'));
 
 it('offers to generate a token when none has been issued', function (): void {
     actAsSuperAdmin();
