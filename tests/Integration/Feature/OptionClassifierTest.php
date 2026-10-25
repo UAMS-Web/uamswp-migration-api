@@ -224,6 +224,10 @@ it('agrees with what the endpoint actually serves', function (): void {
         // what `OptionsPayload::rows()` reads straight off the table.
         $stored = maybe_serialize($value);
 
+        // Every fixture is a string or an array, so the stored row is a string;
+        // the 6.8 stubs type `maybe_serialize()` as `mixed` (D-106).
+        assert(\is_string($stored));
+
         $verdict = OptionsPayload::classify($name, $stored);
         $served = \in_array($verdict, [OptionsPayload::VERDICT_SERVED, OptionsPayload::VERDICT_EXEMPT], true);
 

@@ -144,6 +144,16 @@ parameters:
             identifier: if.alwaysFalse
             path: uamswp-migration-api.php
 
+        # `php-stubs/wordpress-stubs` is pinned `~6.8.0` to match production's
+        # WordPress 6.8.7 (D-106), which resolves to v6.8.3. Those stubs tag
+        # `get_terms()` and `wp_count_terms()` @internal by mistake; both are core
+        # public API, and 6.9.4 drops the tag. Pinned by identifier and by a
+        # message naming the two functions, so a call to any other internal
+        # function still fails.
+        -
+            identifier: function.internal
+            message: '#^Call to internal function (get_terms|wp_count_terms)\(\)\.$#'
+
         # Pest routes its entire public API through classes it tags @internal.
         # expect()->toBe() lands on Pest\Mixins\Expectation, it(…)->skip() on
         # Pest\PendingCalls\TestCall, uses(…)->in() on Pest\PendingCalls\UsesCall.
