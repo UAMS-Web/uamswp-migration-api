@@ -38,6 +38,12 @@ updates:
         update-types:
           - version-update:semver-major
           - version-update:semver-minor
+      # D-106: the stubs PHPStan reads are pinned to production's WordPress minor (~6.8.0), held
+      # for the reason given above.
+      - dependency-name: php-stubs/wordpress-stubs
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
 
   # The Integration suite's own Composer project (#375, #398). It pins Pest 3 and PHPUnit 11
   # because WordPress' test bootstrap needs yoast/phpunit-polyfills, so a major update here is
