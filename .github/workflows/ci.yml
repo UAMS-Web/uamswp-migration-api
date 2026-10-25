@@ -17,28 +17,34 @@ concurrency:
 permissions:
   contents: read
 
-# RUN_REMOTE_CI — budget kill-switch (#18).
-# GitHub Actions minutes bill at the *organization* level — one pool shared by
-# every UAMS-Web repo — and only private repos consume them. This repo is
-# private, so every run here spends from the same pool `uams-statamic` draws on.
-# To stop spending until the monthly reset, set an Actions variable
-# `RUN_REMOTE_CI` to `false`; every job below is gated on
-# `if: vars.RUN_REMOTE_CI != 'false'`, so they report `skipped` and consume zero
-# runner minutes. Unset (or any value other than `false`) = CI runs normally —
-# the default is always-on.
+# REQUIRED CHECKS (D-105). A ruleset for this repository requires three
+# contexts on `main`: `CI`, `Attribution footer` and `Closing keywords`, the
+# same three the Statamic add-ons require. `CI` is the last job in this file; it
+# `needs:` every other job, runs `if: always()`, and fails unless every needed
+# job reports `success` (a `skipped` or `cancelled` job fails it). The ruleset
+# therefore never lists a job by name: renaming a job changes nothing it
+# requires, and a new job is required once it is added to the `needs:` list of
+# `CI`. Add it there in the same change. Do not rename `CI`. The other two are
+# the jobs of `check-attribution-footer.yml` and
+# `check-closing-keyword-across-lines.yml`. Job names must stay unique across
+# every workflow in this repository. The shared local CI runner
+# (`local-ci.json`) does not gate a merge.
 #
-#   - The variable is defined at the ORG level, scoped to private repositories,
-#     so this repo inherits it by carrying the gate; nothing has to be set here.
-#     A REPO variable would override the org value for this repo alone.
+# RUN_REMOTE_CI: off switch (#18). Every job but `CI` is gated on
+# `if: vars.RUN_REMOTE_CI != 'false'`. Set an Actions variable `RUN_REMOTE_CI`
+# to `false` and they report `skipped` without being dispatched to a runner,
+# so `CI` fails and no pull request can merge until it is unset. Unset (or any
+# value other than `false`) = CI runs normally, which is the default.
+#
+#   - The switch began as a budget kill-switch for private repositories, whose
+#     Actions minutes bill to one organization pool. This repository is public,
+#     so its runs do not, and the organization variable (scoped to private
+#     repositories) does not reach it. Only a REPOSITORY variable turns it off
+#     here.
 #   - `vars` cannot gate `on:` triggers, only `if:` — the workflow still
 #     evaluates per event, but skipped jobs are never dispatched to a runner.
-#   - `main` is protected by two organization rulesets (no deletion or force
-#     push; pull request required), and neither requires a status check. A
-#     job skipped by its `if:` reports success, so a required check on one of
-#     these jobs would pass without running while this switch is off: it would
-#     gate nothing rather than block anything. See D-090 and D-101.
-#   - While off, the shared local CI runner is the whole gate. That is not a
-#     fallback; it is the normal operating mode for months at a time.
+#   - A job skipped by its `if:` reports success to a required check (D-101),
+#     which is why the ruleset requires `CI` and never a gated job.
 #
 # PARITY: `local-ci.json` is the job list the shared local CI runner
 # (`.claude/skills/local-ci/local-ci.mjs`, run as `npm run ci:local`) executes
@@ -90,8 +96,7 @@ permissions:
 #   - `handed-back-workflow`: `.github/workflows/clear-handed-back.yml`
 #     against the shared template it is copied from.
 #   - `download-archive`: what `git archive` of HEAD holds under the
-#     `.gitattributes` keep-list (#439). The repository is private, so the
-#     `download-archive-check` skill runs it from the local runner.
+#     `.gitattributes` keep-list (#439), run from the local runner.
 #
 # The runner also validates the remote head in a detached slot, hands the run to
 # the branch's own copy of itself when the two differ, refuses untracked
@@ -593,3 +598,37 @@ jobs:
       # PARITY: mirrored by the node-test job in local-ci.json.
       - name: Run the script tests
         run: node --test "scripts/*.test.mjs"
+
+  # The one check the ruleset requires from this workflow (D-105). Keep `needs:`
+  # listing every other job in the file. Not part of the chain and not gated on
+  # RUN_REMOTE_CI: it must run, and fail, when the switch skips the chain.
+  ci:
+    name: CI
+    needs:
+      - load-guard
+      - lint-floor
+      - validate
+      - floor-functions
+      - glyph
+      - spell
+      - pint
+      - rector
+      - phpstan
+      - pest
+      - node-test
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # `skipped` and `cancelled` fail as well as `failure`: a job that did not run proved nothing.
+      - name: Every needed job succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Needed job results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "::error::A needed job reported $result"
+              exit 1
+            fi
+          done

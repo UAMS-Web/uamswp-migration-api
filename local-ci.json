@@ -1,5 +1,5 @@
 {
-  "_note": "The shared local CI runner's job list for this repository (#366). Every job is always selected, as the private runner it replaces ran every job on every run, and chain stops at the first failure, as ci.yml's needs: chain does. tests/Unit/CiParityTest.php holds the job order against ci.yml.",
+  "_note": "The shared local CI runner's job list for this repository (#366). Every job is always selected, as the private runner it replaces ran every job on every run, and chain stops at the first failure, as ci.yml's needs: chain does. tests/Unit/CiParityTest.php holds the job order against ci.yml. ci.yml's last job, `ci`, has no counterpart here: it aggregates the remote jobs into the `CI` check the ruleset requires, and this run does not gate a merge (D-105).",
   "_prepare": "patches is off: prepare runs before any job, so it would reinstall the slot's old package versions against the commit's patches. The dependencies job installs first and re-syncs patches second, as the private runner did.",
   "base": "main",
   "php": "8.4",

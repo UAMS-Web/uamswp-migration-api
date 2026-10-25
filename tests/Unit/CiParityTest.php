@@ -146,6 +146,35 @@ function ciWorkflowJobs(): array
 }
 
 /**
+ * The id of the aggregate job the ruleset requires as `CI` (D-105).
+ */
+function ciAggregateJob(): string
+{
+    return 'ci';
+}
+
+/**
+ * Every workflow job except the aggregate: the chain, each one gated and marked.
+ *
+ * @return array<string, string>
+ */
+function ciChainedJobs(): array
+{
+    $jobs = ciWorkflowJobs();
+
+    // A throw rather than a filter that finds nothing: without the aggregate,
+    // the aggregate test below would have nothing to read, and this list would
+    // quietly equal every job.
+    if (! isset($jobs[ciAggregateJob()])) {
+        throw new RuntimeException('ci.yml has no `'.ciAggregateJob().'` job.');
+    }
+
+    unset($jobs[ciAggregateJob()]);
+
+    return $jobs;
+}
+
+/**
  * The workflow's chain, derived from the `needs:` graph rather than from file
  * order — order in the file is presentation; `needs:` is what GitHub executes.
  *
@@ -155,7 +184,7 @@ function ciWorkflowChain(): array
 {
     $needs = [];
 
-    foreach (ciWorkflowJobs() as $job => $body) {
+    foreach (ciChainedJobs() as $job => $body) {
         $needs[$job] = preg_match('/^    needs: (\S+)$/m', $body, $matches) === 1 ? $matches[1] : null;
     }
 
@@ -195,7 +224,7 @@ it('gates every workflow job on the RUN_REMOTE_CI kill-switch', function (): voi
     // offender list is what a failure needs to name anyway.
     $missingGate = [];
 
-    foreach (ciWorkflowJobs() as $job => $body) {
+    foreach (ciChainedJobs() as $job => $body) {
         if (! str_contains($body, "if: vars.RUN_REMOTE_CI != 'false'")) {
             $missingGate[] = $job;
         }
@@ -209,7 +238,22 @@ it('chains the workflow jobs in one strict sequence', function (): void {
     // jobs rather than run them in parallel and bill for all of them. A job
     // added without `needs:` silently becomes a second head and runs
     // concurrently — passing, and costing, regardless of what failed.
-    expect(ciWorkflowChain())->toHaveCount(\count(ciWorkflowJobs()));
+    expect(ciWorkflowChain())->toHaveCount(\count(ciChainedJobs()));
+});
+
+it('aggregates every chained job into the required CI check', function (): void {
+    // The ruleset requires `CI` alone. A job missing from its `needs:` list is
+    // required by nothing, which reads as a gate and is not one; a gated
+    // aggregate would be skipped with the chain and report success (D-101).
+    $body = ciWorkflowJobs()[ciAggregateJob()];
+
+    preg_match('/^    needs:\n((?:      - \S+\n?)+)/m', $body, $matches);
+    preg_match_all('/^      - (\S+)$/m', $matches[1] ?? '', $needed);
+
+    expect($body)->toMatch('/^    name: CI$/m')
+        ->and($body)->toMatch('/^    if: always\(\)$/m')
+        ->and($body)->not->toContain('RUN_REMOTE_CI')
+        ->and($needed[1])->toBe(ciWorkflowChain());
 });
 
 it('runs the same jobs, in the same order, locally and remotely', function (): void {
@@ -277,7 +321,7 @@ it('marks the parity-critical run step of every job', function (): void {
     // pressure.
     $unmarked = [];
 
-    foreach (ciWorkflowJobs() as $job => $body) {
+    foreach (ciChainedJobs() as $job => $body) {
         if (! str_contains($body, '# PARITY:')) {
             $unmarked[] = $job;
         }
