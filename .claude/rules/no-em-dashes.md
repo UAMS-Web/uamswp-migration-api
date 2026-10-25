@@ -44,5 +44,3 @@ A third exception is not a title: **verbatim text from an external source that i
 ## What this is not
 
 This is not a ban on the hyphen-minus (`-`), the en dash (`U+2013`) in numeric ranges where a repository already uses them, or ASCII `--` in flags and Conventional Commit footers. It is specifically the em dash `U+2014` used as clause punctuation. The two title forms above are the only approved uses in shared and synced text.
-
-A hand edit to show the synced-files check failing; reverted in the next commit.
