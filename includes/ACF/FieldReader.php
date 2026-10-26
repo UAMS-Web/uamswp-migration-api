@@ -196,8 +196,10 @@ final class FieldReader
      *
      * **The two answer the same question here** (D-069). The newer function
      * routes through `acf_get_meta_instance($type)->get_value()`, whose base
-     * implementation is the older function's meta branch and whose one shipped
-     * override, `Meta\Option::get_value()`, is its option branch. Both consult
+     * implementation is the older function's meta branch and whose
+     * `Meta\Option::get_value()` override is its option branch. ACF PRO's
+     * `WooOrder` override reads WooCommerce orders, a shape this reader never
+     * passes. Both consult
      * `acf/pre_load_metadata` with the same arguments, which is the filter ACF
      * Custom Database Tables intercepts, so the fallback stays right for the
      * `location` and `provider` values that live only in custom tables.
@@ -205,8 +207,8 @@ final class FieldReader
      * **The 6.4 call is still preferred where it exists**, because the older
      * one reads core meta directly and bypasses the meta-location indirection
      * 6.4 added. And the two diverge where no meta instance is registered
-     * (`block`, `blog`, `woo_order`): the newer returns `false`, which reads as
-     * stored, the older `null`. The three shapes this plugin passes decode to
+     * (`block` and `blog`, and `woo_order` without ACF PRO): the newer returns
+     * `false`, which reads as stored, the older `null`. The three shapes this plugin passes decode to
      * `post`, `term` and `option`, which all have one.
      *
      * The name guard mirrors the newer function's own bail on an empty name,

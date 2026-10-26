@@ -78,21 +78,28 @@ $method = new ReflectionMethod(UAMSWP\MigrationAPI\ACF\FieldReader::class, 'stor
 
 $results = [];
 
-foreach (json_decode($argv[3], true) as [$id, $field]) {
+foreach (json_decode((string) file_get_contents($argv[3]), true) as [$id, $field]) {
     $results[] = $method->invoke(null, $id, $field);
 }
 
 echo json_encode(['results' => $results, 'calls' => $GLOBALS['acfGuardCalls']]);
 PHP);
 
+    // The reads go through a file rather than an argument: on Windows
+    // `escapeshellarg()` replaces every double quote with a space, which would
+    // reach the child as JSON it cannot decode.
+    $readsFile = $directory.'/reads.json';
+    file_put_contents($readsFile, (string) json_encode($reads));
+
     $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($script).' '.escapeshellarg($root)
-        .' '.escapeshellarg($arm).' '.escapeshellarg((string) json_encode($reads)).' 2>&1';
+        .' '.escapeshellarg($arm).' '.escapeshellarg($readsFile).' 2>&1';
 
     $output = [];
     $exitCode = 0;
     exec($command, $output, $exitCode);
 
     unlink($script);
+    unlink($readsFile);
     rmdir($directory);
 
     return [$exitCode, implode("\n", $output)];
