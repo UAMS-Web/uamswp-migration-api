@@ -157,6 +157,61 @@ it('serves the custom-table value in `acf` while `meta` still carries the frozen
     'ACF Custom Database Tables is not installed alongside this checkout; the divergence cannot be reproduced without it.'
 );
 
+it('reports a value held only in the custom table as stored on both metadata probes', function (): void {
+    // The reader asks `acf_get_metadata_by_field()` whether a row exists, and
+    // below ACF 6.4 asks `acf_get_metadata()` instead (#22, D-107). Both must
+    // see a custom-table row that has no postmeta beside it, or a `location`
+    // or `provider` value would move into the defaulted view as if the field
+    // definition had supplied it. The field carries a default so that move
+    // would show.
+    cdtBuildFixture();
+
+    $field = [
+        'key' => 'field_cdt_fixture_headline',
+        'name' => 'cdt_fixture_headline',
+        'type' => 'text',
+        'label' => 'Headline',
+        'default_value' => 'SUPPLIED by the field definition.',
+    ];
+
+    acf_add_local_field_group([
+        'key' => 'group_cdt_fixture',
+        'title' => 'CDT fixture',
+        'fields' => [$field],
+        'location' => [[['param' => 'post_type', 'operator' => '==', 'value' => 'post']]],
+    ]);
+
+    $id = makePost();
+    $current = 'CURRENT, and held only in the custom table.';
+
+    $wpdb = testDatabase();
+    $wpdb->replace($wpdb->prefix.'uamswp_cdt_fixture', ['post_id' => $id, 'cdt_fixture_headline' => $current]);
+
+    wp_cache_flush();
+    FieldReader::resetValueStore();
+
+    // No postmeta at all, so a probe that read core meta directly would report
+    // no row here: the custom table is the only thing either probe can see.
+    expect(get_post_meta($id, 'cdt_fixture_headline'))->toBe([]);
+
+    // CDT answers `acf/pre_load_metadata` only for a field whose value it has
+    // already fetched through `acf/pre_load_value`, so the probes are asked
+    // in the reader's own order: the value first, then whether a row exists.
+    expect(acf_get_value($id, $field))->toBe($current)
+        ->and(acf_get_metadata($id, 'cdt_fixture_headline'))->toBe($current)
+        ->and(acf_get_metadata_by_field($id, $field))->toBe($current);
+
+    FieldReader::resetValueStore();
+
+    $read = FieldReader::forPost($id);
+
+    expect($read['names']['cdt_fixture_headline'] ?? null)->toBe($current)
+        ->and($read['defaulted_names'])->not->toHaveKey('cdt_fixture_headline');
+})->skip(
+    ! cdtAvailable() || ! \function_exists('acf_get_metadata_by_field'),
+    'Needs ACF Custom Database Tables, and ACF 6.4 or later to compare the two probes.'
+);
+
 afterEach(function (): void {
     if (cdtAvailable()) {
         cdtTearDownFixture();

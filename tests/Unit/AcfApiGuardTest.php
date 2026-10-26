@@ -100,7 +100,7 @@ it('never resolves a field type through `acf_get_field_type()`', function (): vo
     expect(acfGuardCallers(acfGuardSources(), 'acf_get_field_type'))->toBe([]);
 });
 
-it('reads ACF only through the five functions it is allowed', function (): void {
+it('reads ACF only through the six functions it is allowed', function (): void {
     // The complement of the two bans: an allowlist, so a sixth ACF entry point
     // added later is a deliberate edit here rather than an unremarked one
     // elsewhere. `acf_get_store` is included because the value-store reset is
@@ -112,14 +112,15 @@ it('reads ACF only through the five functions it is allowed', function (): void 
     // also what ACF Custom Database Tables intercepts, which is why it stays
     // correct for values living only in a custom table.
     //
-    // A sixth entry, `acf_get_metadata`, lived here from #169/D-069 to #175:
-    // the pre-6.4 twin of the fifth, called only where `acf_get_metadata_by_field()`
-    // did not exist. #175 removed the fallback once every development machine
-    // reached ACF PRO 6.4.2, and this entry went with the code it guarded.
+    // `acf_get_metadata` is the sixth: the pre-6.4 twin of the fifth, called
+    // only where `acf_get_metadata_by_field()` does not exist (D-069). It was
+    // removed once every development machine reached ACF PRO 6.4.2, and came
+    // back when the go.uams.edu network, on an older ACF, raised a fatal error
+    // without it (#22, D-107).
     //
     // This list widening is the point of the guard, not a defeat of it: the
     // test exists to make an addition a decision somebody argued for.
-    $allowed = ['acf_get_field_groups', 'acf_get_fields', 'acf_get_value', 'acf_get_store', 'acf_get_metadata_by_field'];
+    $allowed = ['acf_get_field_groups', 'acf_get_fields', 'acf_get_value', 'acf_get_store', 'acf_get_metadata_by_field', 'acf_get_metadata'];
     $used = [];
 
     foreach (acfGuardSources() as $source) {
