@@ -11,14 +11,14 @@ namespace UAMSWP\MigrationAPI\ACF;
 /**
  * The plugin's only route to ACF.
  *
- * Five functions, and nothing else: `acf_get_field_groups()` to discover,
+ * Six functions, and nothing else: `acf_get_field_groups()` to discover,
  * `acf_get_fields()` to enumerate, `acf_get_value()` to read,
- * `acf_get_store()` to drop what reading memoized, and
- * `acf_get_metadata_by_field()` to tell a stored value from one the
- * definition supplied (D-038). Nothing in ACF's `includes/rest-api/` is
- * reachable from this namespace — it matches `/wp/v2/…` routes exclusively —
- * and `acf_format_value_for_rest()` raises a fatal on this network. See
- * `docs/DECISIONS.md` D-024.
+ * `acf_get_store()` to drop what reading memoized, and the
+ * `acf_get_metadata_by_field()` / `acf_get_metadata()` pair to tell a stored
+ * value from one the definition supplied (D-038, D-069, D-107). Nothing in
+ * ACF's `includes/rest-api/` is reachable from this namespace — it matches
+ * `/wp/v2/…` routes exclusively — and `acf_format_value_for_rest()` raises a
+ * fatal on this network. See `docs/DECISIONS.md` D-024.
  *
  * **No field-type object is ever obtained, let alone called.** `acf_get_field_type()`
  * does not always return an `acf_field`: on this network `maskfield` resolves to
@@ -186,20 +186,47 @@ final class FieldReader
     }
 
     /**
-     * Whether ACF holds a row for this field.
+     * Whether ACF holds a row for this field, on whichever API this ACF has.
      *
-     * Consults `acf/pre_load_metadata`, which is the filter ACF Custom
-     * Database Tables intercepts, so this stays right for exactly the
-     * `location` and `provider` values this project exists to rescue. See
-     * `docs/DECISIONS.md` D-069 for the pre-6.4 fallback this used to carry
-     * and #175, which removed it once every development machine was on ACF
-     * PRO 6.4.2.
+     * `acf_get_metadata_by_field()` is `@since 6.4`, and below that it does
+     * not exist. Unguarded, the call raised a fatal error on the go.uams.edu
+     * network, whose ACF is older, on the first ACF-backed field `posts/page`
+     * read for site 3 (#22). So the 6.4 call is used where it exists and
+     * `acf_get_metadata()` where it does not.
+     *
+     * **The two answer the same question here** (D-069). The newer function
+     * routes through `acf_get_meta_instance($type)->get_value()`, whose base
+     * implementation is the older function's meta branch and whose one shipped
+     * override, `Meta\Option::get_value()`, is its option branch. Both consult
+     * `acf/pre_load_metadata` with the same arguments, which is the filter ACF
+     * Custom Database Tables intercepts, so the fallback stays right for the
+     * `location` and `provider` values that live only in custom tables.
+     *
+     * **The 6.4 call is still preferred where it exists**, because the older
+     * one reads core meta directly and bypasses the meta-location indirection
+     * 6.4 added. And the two diverge where no meta instance is registered
+     * (`block`, `blog`, `woo_order`): the newer returns `false`, which reads as
+     * stored, the older `null`. The three shapes this plugin passes decode to
+     * `post`, `term` and `option`, which all have one.
+     *
+     * The name guard mirrors the newer function's own bail on an empty name,
+     * except that a field named `0` is treated as a name rather than as empty.
      *
      * @param  array<string, mixed>  $field
      */
     private static function storedMetadata(int|string $objectId, array $field): mixed
     {
-        return acf_get_metadata_by_field($objectId, $field);
+        if (\function_exists('acf_get_metadata_by_field')) {
+            return acf_get_metadata_by_field($objectId, $field);
+        }
+
+        $name = $field['name'] ?? null;
+
+        if (! \is_string($name) || $name === '') {
+            return null;
+        }
+
+        return acf_get_metadata($objectId, $name);
     }
 
     /**
