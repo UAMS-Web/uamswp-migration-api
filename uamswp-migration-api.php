@@ -4,7 +4,7 @@
  * Plugin Name:       UAMSWP Migration API
  * Plugin URI:        https://github.com/UAMS-Web/uamswp-migration-api
  * Description:       Read-only migration API serving raw, current WordPress content to the Statamic importer. Temporary — remove when the migration completes.
- * Version:           0.6.1
+ * Version:           0.7.0
  * Requires at least: 6.4
  * Requires PHP:      8.2
  * Author:            UAMS Web
