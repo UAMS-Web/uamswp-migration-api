@@ -189,10 +189,13 @@ final class FieldReader
      * Whether ACF holds a row for this field, on whichever API this ACF has.
      *
      * `acf_get_metadata_by_field()` is `@since 6.4`, and below that it does
-     * not exist. Unguarded, the call raised a fatal error on the go.uams.edu
-     * network, whose ACF is older, on the first ACF-backed field `posts/page`
-     * read for site 3 (#22). So the 6.4 call is used where it exists and
-     * `acf_get_metadata()` where it does not.
+     * not exist. A theme can load an older ACF than the plugin: the uams-2016
+     * theme includes its bundled ACF PRO 5.9.9 when no `acf` class is loaded,
+     * so a site where the plugin is inactive runs 5.9.9 while the network's
+     * plugin reports a later version. Unguarded, the call raised a fatal error
+     * there on the first ACF-backed field `posts/page` read (#22). So the
+     * guard asks whether the function exists, never which version is
+     * installed, and uses `acf_get_metadata()` where it does not.
      *
      * **The two answer the same question here** (D-069). The newer function
      * routes through `acf_get_meta_instance($type)->get_value()`, whose base
