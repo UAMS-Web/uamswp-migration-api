@@ -17,6 +17,13 @@ concurrency:
 permissions:
   contents: read
 
+# Bash on both operating systems (#25). A Windows runner defaults `run:` to
+# PowerShell, and every step here is written for a POSIX shell; Git Bash ships
+# on the Windows image.
+defaults:
+  run:
+    shell: bash
+
 # REQUIRED CHECKS (D-105). A ruleset for this repository requires three
 # contexts on `main`: `CI`, `Attribution footer` and `Closing keywords`, the
 # same three the Statamic add-ons require. `CI` is the last job in this file; it
@@ -129,8 +136,14 @@ permissions:
 
 jobs:
   load-guard:
-    name: Load guard (no vendor/ at runtime)
-    runs-on: ubuntu-latest
+    name: Load guard (no vendor/ at runtime) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # First (cheapest) link in the cost-ordered chain: every other job runs
     # downstream via `needs:`, so a failure here skips — and never bills for —
     # the entire rest of the pipeline.
@@ -158,8 +171,14 @@ jobs:
         run: php scripts/check-no-vendor-dependency.php
 
   lint-floor:
-    name: Floor lint (php -l on PHP 8.2)
-    runs-on: ubuntu-latest
+    name: Floor lint (php -l on PHP 8.2) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs only after the load guard passes.
     needs: load-guard
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
@@ -182,8 +201,14 @@ jobs:
         run: git ls-files -z -- '*.php' ':!:vendor/**' ':!:tests/**' ':!:node_modules/**' | xargs -0 -n1 php -l
 
   validate:
-    name: Composer validate (composer.lock freshness)
-    runs-on: ubuntu-latest
+    name: Composer validate (composer.lock freshness) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs only after the floor lint passes.
     needs: lint-floor
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
@@ -217,8 +242,14 @@ jobs:
         run: composer validate --no-check-publish --no-check-all
 
   floor-functions:
-    name: Floor functions (polyfilled calls on PHP 8.2)
-    runs-on: ubuntu-latest
+    name: Floor functions (polyfilled calls on PHP 8.2) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs only after composer validate passes, so it installs from a
     # lock that matches composer.json.
     needs: validate
@@ -247,8 +278,14 @@ jobs:
         run: php scripts/check-floor-functions.php
 
   glyph:
-    name: Glyph audit (no emoji in durable records)
-    runs-on: ubuntu-latest
+    name: Glyph audit (no emoji in durable records) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs only after the floor-functions guard passes.
     needs: floor-functions
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
@@ -280,8 +317,14 @@ jobs:
         run: node scripts/check-no-glyphs.mjs
 
   synced-files:
-    name: Synced files (match the sync manifest)
-    runs-on: ubuntu-latest
+    name: Synced files (match the sync manifest) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs only after the glyph audit passes.
     needs: glyph
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
@@ -303,8 +346,14 @@ jobs:
         run: node .claude/skills/synced-files/scripts/check-synced-files.mjs
 
   handed-back-workflow:
-    name: Handed-back workflow (matches its template)
-    runs-on: ubuntu-latest
+    name: Handed-back workflow (matches its template) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs only after the synced-files check passes.
     needs: synced-files
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
@@ -326,8 +375,14 @@ jobs:
         run: node .claude/skills/handed-back-label/scripts/check-handed-back-workflow.mjs
 
   download-archive:
-    name: Download archive (only what the plugin runs)
-    runs-on: ubuntu-latest
+    name: Download archive (only what the plugin runs) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs only after the handed-back workflow check passes.
     needs: handed-back-workflow
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
@@ -349,8 +404,14 @@ jobs:
         run: node .claude/skills/download-archive-check/check-download-archive.mjs
 
   aggregate-needs:
-    name: Aggregate needs (every job is in CI's needs)
-    runs-on: ubuntu-latest
+    name: Aggregate needs (every job is in CI's needs) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs only after the download-archive check passes.
     needs: download-archive
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
@@ -373,8 +434,14 @@ jobs:
         run: node .claude/skills/code-quality/scripts/check-aggregate-needs.mjs
 
   spell:
-    name: Spell check (cspell)
-    runs-on: ubuntu-latest
+    name: Spell check (cspell) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs only after the aggregate-needs check passes.
     needs: aggregate-needs
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
@@ -400,8 +467,14 @@ jobs:
         run: npm run spell
 
   pint:
-    name: Pint (changed files)
-    runs-on: ubuntu-latest
+    name: Pint (changed files) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs only after the spell check passes. Pint MUST come before
     # Rector — the two rewrite the same files, and rector.php leaves import
     # removal to Pint alone.
@@ -462,8 +535,14 @@ jobs:
         run: echo "No PHP files changed in this PR/push; skipping Pint."
 
   rector:
-    name: Rector (gating profile)
-    runs-on: ubuntu-latest
+    name: Rector (gating profile) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs only after Pint passes.
     needs: pint
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
@@ -513,8 +592,14 @@ jobs:
             vendor/bin/rector --dry-run --no-progress-bar
 
   phpstan:
-    name: PHPStan (level max)
-    runs-on: ubuntu-latest
+    name: PHPStan (level max) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs only after Rector passes.
     needs: rector
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
@@ -550,8 +635,14 @@ jobs:
         run: composer stan
 
   pest:
-    name: Pest (Unit + Integration)
-    runs-on: ubuntu-latest
+    name: Pest (Unit + Integration) on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs LAST — the only job needing a database and a WordPress
     # tree, so everything cheaper gates it.
     needs: phpstan
@@ -569,7 +660,11 @@ jobs:
         # test installer DROPS EVERY TABLE it finds, which is why
         # tests/Integration/bootstrap.php refuses to run against the working install's
         # database — irrelevant here, load-bearing locally.
-        image: mysql:8.0
+        #
+        # Linux only: a Windows runner cannot run service containers, and an
+        # empty image is how a service is left out of one leg (#25). The Windows
+        # leg installs MySQL with a step below instead.
+        image: ${{ matrix.os == 'ubuntu-latest' && 'mysql:8.0' || '' }}
         env:
           MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
           MYSQL_DATABASE: uamswp_migration_api_tests
@@ -632,7 +727,21 @@ jobs:
         run: |
           curl -sSfL "https://wordpress.org/wordpress-${{ steps.wordpress.outputs.slug }}.tar.gz" \
             -o "$RUNNER_TEMP/wordpress.tar.gz"
-          tar -xzf "$RUNNER_TEMP/wordpress.tar.gz" -C "$RUNNER_TEMP"
+          # --force-local: on Windows RUNNER_TEMP is `D:\a\_temp`, and GNU tar
+          # reads a colon in an archive name as a remote host.
+          tar --force-local -xzf "$RUNNER_TEMP/wordpress.tar.gz" -C "$RUNNER_TEMP"
+
+      # The Linux leg's database is the service above. The action starts MySQL
+      # with a passwordless root, the same credentials the service provides.
+      - name: Set up MySQL 8.0 (Windows)
+        if: runner.os == 'Windows'
+        uses: shogo82148/actions-setup-mysql@v1
+        with:
+          mysql-version: '8.0'
+
+      - name: Create the test database (Windows)
+        if: runner.os == 'Windows'
+        run: mysql -h 127.0.0.1 -P 3306 -u root -e 'CREATE DATABASE IF NOT EXISTS uamswp_migration_api_tests'
 
       - name: Wait for MySQL
         run: |
@@ -665,8 +774,14 @@ jobs:
         run: composer test
 
   node-test:
-    name: Node tests
-    runs-on: ubuntu-latest
+    name: Node tests on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     # CI chain: runs last, after pest -- ported from wordpress-importer's
     # reference implementation as-is rather than re-ordered by cost, per #150.
     needs: pest
