@@ -44,6 +44,7 @@ jobs:
       && (github.event.action == 'opened'
       || (github.event.action == 'closed' && github.event.pull_request.merged == true))
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       issues: write
       pull-requests: write

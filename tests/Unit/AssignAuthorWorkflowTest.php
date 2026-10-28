@@ -45,7 +45,7 @@ const ASSIGN_AUTHOR_REPO = 'UAMS-Web/uamswp-migration-api';
  * `wordpress-importer` and this repository, so a one-sided edit changes this
  * hash and fails here, before the copies can drift apart.
  */
-const ASSIGN_AUTHOR_BODY_SHA256 = 'ceb2f50913e107198f826ab01bb22ea8062c17cbe1381101fdc6c75d62a05ec6';
+const ASSIGN_AUTHOR_BODY_SHA256 = '83679189f8977da63396f0dac3d28849c628371ea6a894c443830c2729b10b17';
 
 /**
  * The workflow's source, or another file's when a path is given.
