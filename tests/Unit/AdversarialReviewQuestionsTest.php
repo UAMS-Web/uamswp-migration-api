@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /*
  * #343: the `adversarial-review` rule carries the review questions ported from
- * `UAMS-Web/uams-statamic#2712`, so a later edit cannot drop one without a
+ * `UAMS-Web/uams-statamic-archive#2712`, so a later edit cannot drop one without a
  * failure.
  *
  * Each case pins one checklist by the items a reviewer answers, not by its

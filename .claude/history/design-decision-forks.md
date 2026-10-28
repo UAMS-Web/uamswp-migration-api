@@ -9,7 +9,7 @@ Not auto-loaded. Read it when a rule is questioned, before re-arguing it.
 
 ## What a `decision-fork` ticket delivers, and what it does not
 
-**Why this is the shape rather than a refinement of "flip the label and build it."** A ticket carrying both a fork and its build has two deliverables in one artifact: one that waits on a human and one that waits on nothing. Fused, the second inherits the first's latency with no signal that it has — the build sits blocked behind a decision it does not actually depend on. Splitting them means the decision resolves in one conversation and the build ships the same afternoon, instead of both moving at the slower one's pace. `UAMS-Web/uams-statamic#2159` is the case that cost real time this way: build work fused to a fork sat blocked for days before an operator instruction split it out as `UAMS-Web/uams-statamic#2171`, which shipped immediately once separated.
+**Why this is the shape rather than a refinement of "flip the label and build it."** A ticket carrying both a fork and its build has two deliverables in one artifact: one that waits on a human and one that waits on nothing. Fused, the second inherits the first's latency with no signal that it has — the build sits blocked behind a decision it does not actually depend on. Splitting them means the decision resolves in one conversation and the build ships the same afternoon, instead of both moving at the slower one's pace. `UAMS-Web/uams-statamic-archive#2159` is the case that cost real time this way: build work fused to a fork sat blocked for days before an operator instruction split it out as `UAMS-Web/uams-statamic-archive#2171`, which shipped immediately once separated.
 
 ## Original wording of passages condensed in place
 
@@ -29,4 +29,4 @@ A human decides a fork by **weighing trade-offs across dimensions**, not from a 
 
 - Not the *action* flavor of `hitl`. An issue that is `hitl` only because it needs a real-world step (a deploy, provisioning, recruiting, installing — work outside the repo) has **no fork to surface**; manufacturing "decisions" on it misleads a future agent. This rule is for the decision flavor.
 
-- Not a reopening of how dependencies are expressed. `UAMS-Web/uams-statamic#2097` settled that as native edges only, never a textual relationship line in a body — *what a `decision-fork` ticket may contain* is a different question from *how a dependency is recorded*, and this file only answers the first.
+- Not a reopening of how dependencies are expressed. `UAMS-Web/uams-statamic-archive#2097` settled that as native edges only, never a textual relationship line in a body — *what a `decision-fork` ticket may contain* is a different question from *how a dependency is recorded*, and this file only answers the first.

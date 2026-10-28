@@ -23,7 +23,7 @@ use Symfony\Component\Process\Process;
  * also depends on the extracted script, so a reader that extracted the wrong
  * lines fails those too.
  *
- * Ported from `uams-statamic`'s `AssignAuthorWorkflowTest` (UAMS-Web/uams-statamic#2685),
+ * Ported from `uams-statamic`'s `AssignAuthorWorkflowTest` (UAMS-Web/uams-statamic-archive#2685),
  * with the same cases.
  */
 
