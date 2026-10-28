@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Post the gate's verdict comment on a pull request and, on a hand-back, apply the
- * `handed-back` label in the same run (UAMS-Web/uams-statamic#2845,
+ * `handed-back` label in the same run (UAMS-Web/uams-statamic-archive#2845,
  * UAMS-Web/uams-claude-skills#120).
  *
  * The verdict comment and the label used to be two separate `gh api` calls, and the

@@ -90,10 +90,10 @@
         "requires": ["scripts/python-tests.mjs", "bin:node"]
       },
       {
-        "name": "exports-gitlink",
-        "run": "node scripts/exports-gitlink-check.mjs",
-        "always": true,
-        "requires": ["scripts/exports-gitlink-check.mjs", "bin:node"]
+        "name": "mutate-ignore-breadth",
+        "run": "php .claude/skills/pest-testing/scripts/check-mutate-ignore-breadth.php",
+        "paths": ["**/*.php", "!vendor/**", "tests/mutate-ignore-breadth.baseline.json", "composer.lock"],
+        "requires": ["vendor/pestphp/pest-plugin-mutate", ".claude/skills/pest-testing/scripts/check-mutate-ignore-breadth.php"]
       }
     ]
   },
@@ -130,6 +130,12 @@
         "run": "node --test",
         "each": ["scripts/*.test.mjs"],
         "requires": ["bin:node"]
+      },
+      {
+        "name": "mutate-ignore-breadth",
+        "run": "php .claude/skills/pest-testing/scripts/check-mutate-ignore-breadth.php",
+        "paths": ["**/*.php", "!vendor/**", "tests/mutate-ignore-breadth.baseline.json", "composer.lock"],
+        "requires": ["vendor/pestphp/pest-plugin-mutate", ".claude/skills/pest-testing/scripts/check-mutate-ignore-breadth.php"]
       }
     ]
   }

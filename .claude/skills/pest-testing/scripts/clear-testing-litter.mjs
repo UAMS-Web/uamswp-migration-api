@@ -41,6 +41,10 @@
 // inside the repository, is a symbolic link: the removal never leaves the directory. A link
 // inside it is removed as a link; its target is not touched.
 //
+// A failing command's own output (stderr, else stdout) is quoted in the failure message, under
+// the command and its exit status; a command that cannot start says so, with the system's
+// reason. A command that succeeds has its output replayed unchanged.
+//
 // Exit 0 done, 1 a step failed (a removal, the restore or an artisan command), 2 refused
 // before anything changed (not an application root, a symbolic link, or a live mutation run).
 //
@@ -120,12 +124,40 @@ export function liveMutateStatusPath(root) {
     return null
 }
 
-/** Run one fixed command line in `root`; returns its exit status (null when it could not start). */
-function run(command, root) {
+/**
+ * Run one fixed command line in `root`. The output is captured rather than inherited so a
+ * failure can quote it; a run that succeeds replays it, so the quiet path prints what it
+ * always did. `status` is null when the command could not start, and then `error` says why.
+ */
+function run(command, root, spawn = spawnSync) {
     // A fixed command string through the shell, so Windows' `.bat` shims (Herd's `php`) run;
     // nothing from outside the script reaches the string.
-    const result = spawnSync(command, { cwd: root, shell: true, stdio: 'inherit' })
-    return result.error ? null : result.status
+    const result = spawn(command, { cwd: root, shell: true, encoding: 'utf8' })
+    const captured = {
+        status: result.error ? null : result.status,
+        error: result.error ?? null,
+        signal: result.signal ?? null,
+        stdout: result.stdout ?? '',
+        stderr: result.stderr ?? '',
+    }
+    if (captured.status === 0) {
+        process.stdout.write(captured.stdout)
+        process.stderr.write(captured.stderr)
+    }
+    return captured
+}
+
+/**
+ * The parenthesized outcome of a failed command plus the reason it gave: `(exit 3)` followed
+ * by its trimmed stderr (stdout when stderr is empty), indented under the message; or, when
+ * the command never started, `(could not start: <message>)`, or `(ended by <signal>)` when a
+ * signal stopped it.
+ */
+export function failureDetail({ status, error, signal = null, stdout, stderr }) {
+    if (status === null && signal) return `(ended by ${signal})`
+    if (status === null) return `(could not start: ${error ? error.message : 'no exit status was reported'})`
+    const reason = (stderr.trim() || stdout.trim()).replace(/\r?\n/gu, '\n    ')
+    return reason ? `(exit ${status})\n    ${reason}` : `(exit ${status})`
 }
 
 /** Flags from the command line: `--force`, `--skip-artisan`, `--root=<dir>`. */
@@ -140,7 +172,7 @@ export function parseArgs(argv) {
     return options
 }
 
-export function main(root = process.cwd(), out = console.log, err = console.error, { force = false, skipArtisan = false } = {}) {
+export function main(root = process.cwd(), out = console.log, err = console.error, { force = false, skipArtisan = false, spawn = spawnSync } = {}) {
     const why = refusal(root)
     if (why) {
         err(`clear-testing-litter: refused: ${why}. Nothing was changed.`)
@@ -179,18 +211,18 @@ export function main(root = process.cwd(), out = console.log, err = console.erro
 
     if (!keptPlaceholder) {
         const command = `git checkout -- ${TESTING_DIR}/${PLACEHOLDER}`
-        const status = run(command, root)
-        if (status !== 0 || !existsSync(join(dir, PLACEHOLDER))) {
-            err(`clear-testing-litter: \`${command}\` did not restore ${TESTING_DIR}/${PLACEHOLDER} (exit ${status})`)
+        const result = run(command, root, spawn)
+        if (result.status !== 0 || !existsSync(join(dir, PLACEHOLDER))) {
+            err(`clear-testing-litter: \`${command}\` did not restore ${TESTING_DIR}/${PLACEHOLDER} ${failureDetail(result)}`)
             return 1
         }
         out(`restored ${TESTING_DIR}/${PLACEHOLDER}`)
     }
 
     for (const command of skipArtisan ? [] : ARTISAN_COMMANDS) {
-        const status = run(command, root)
-        if (status !== 0) {
-            err(`clear-testing-litter: \`${command}\` failed (exit ${status})`)
+        const result = run(command, root, spawn)
+        if (result.status !== 0) {
+            err(`clear-testing-litter: \`${command}\` failed ${failureDetail(result)}`)
             return 1
         }
     }

@@ -130,6 +130,12 @@
 //              `tooling absent`; a run whose selected jobs were all skipped this way
 //              is NOTHING RAN, and a run where some passed and some were skipped
 //              this way is `PASS (incomplete)`, never a bare PASS.
+//     installs true: this job installs the repository's dependencies
+//              (`composer install`). The run refuses before any job when a
+//              selected job runs a `vendor/bin` tool and `vendor/autoload.php`
+//              is absent; a selected `installs` job listed before the first
+//              such job stands that refusal down, so a fresh slot reaches the
+//              job that creates `vendor/`.
 //     mutation `{"minScore": 100}`: the job's output is part of its verdict. The
 //              command's output is read for Pest's `N Mutations for M Files
 //              created` line and its `Score: N%` line, and the job fails when
@@ -362,7 +368,7 @@ const asStringList = (value, what) => {
 // only guess about, so a typo in the config fails here with the key named
 // rather than as a job that never runs.
 const TOP_LEVEL_KEYS = ['base', 'php', 'chain', 'guard', 'jobs', 'prepare', 'statusContext', 'watch']
-const JOB_KEYS = ['name', 'run', 'always', 'each', 'paths', 'requires', 'mutation', 'parallel', 'database', 'php']
+const JOB_KEYS = ['name', 'run', 'always', 'each', 'paths', 'requires', 'mutation', 'parallel', 'database', 'php', 'installs']
 const GUARD_KEYS = ['deny']
 const MUTATION_KEYS = ['minScore']
 const PARALLEL_KEYS = ['serialGroup', 'memoryLimit']
@@ -453,6 +459,9 @@ export function parseConfig(raw) {
             throw new Error(`${where}.parallel cannot be combined with "each" or "mutation".`)
         }
         const database = parseDatabase(job.database, `${where}.database`)
+        if (job.installs !== undefined && typeof job.installs !== 'boolean') {
+            throw new Error(`${where}.installs must be true or false.`)
+        }
         const jobPhp = job.php === undefined ? null : job.php
         if (jobPhp !== null && (typeof jobPhp !== 'string' || !/^\d+\.\d+$/.test(jobPhp))) {
             throw new Error(`${where}.php must be a version like "8.2".`)
@@ -460,7 +469,7 @@ export function parseConfig(raw) {
         if (jobPhp !== null && !needsPhp(job.run)) {
             throw new Error(`${where}.php needs "run" to start with php or vendor/bin/; nothing else runs under PHP.`)
         }
-        return { name: job.name, run: job.run.trim(), paths, each, always: job.always === true, requires, mutation, parallel, database, php: jobPhp }
+        return { name: job.name, run: job.run.trim(), paths, each, always: job.always === true, requires, mutation, parallel, database, php: jobPhp, installs: job.installs === true }
     })
 
     const statusContext = config.statusContext === undefined ? 'local-ci' : config.statusContext
@@ -665,6 +674,29 @@ function normalizeRequirement(entry, where) {
         throw new Error(`${where} entry ${JSON.stringify(entry)} must be a path inside the repository (or "bin:<command>").`)
     }
     return path
+}
+
+// True when the run must stop before any job because a selected vendor/bin job
+// would start with no vendor/autoload.php. A selected job marked `installs`
+// that runs before the first vendor/bin job is the repository's own bootstrap,
+// so the check stands down and that job's result carries the message. `selected`
+// is in the order the jobs run.
+export function vendorMissingFor(selected, vendorPresent) {
+    if (vendorPresent) {
+        return false
+    }
+    for (const entry of selected) {
+        if (!entry.job) {
+            continue
+        }
+        if (entry.job.installs) {
+            return false
+        }
+        if (/^vendor[\\/]bin[\\/]/.test(entry.job.run)) {
+            return true
+        }
+    }
+    return false
 }
 
 // The `requires` entries that are not met, in the order written. `exists` and
@@ -2385,9 +2417,10 @@ function main(argv) {
 
     // Fail before any job runs, naming the remedy, rather than letting every
     // vendor/bin job fail with the shell's "not found".
-    const wantsVendor = selection.selected.some((entry) => entry.job && /^vendor[\\/]bin[\\/]/.test(entry.job.run))
-    if (wantsVendor && !existsSync(join(repoRoot, 'vendor', 'autoload.php'))) {
-        throw new Error(`vendor/ is missing in ${repoRoot}; the selected jobs run vendor/bin tools. Run \`composer install\` first.`)
+    if (vendorMissingFor(selection.selected, existsSync(join(repoRoot, 'vendor', 'autoload.php')))) {
+        throw new Error(
+            `vendor/ is missing in ${repoRoot}; the selected jobs run vendor/bin tools and no job marked "installs" runs before them. Run \`composer install\` first, or mark the job that installs dependencies "installs": true and list it before the first vendor/bin job.`,
+        )
     }
 
     let php = null
