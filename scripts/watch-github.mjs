@@ -37,7 +37,7 @@
  *
  * **Ported from `UAMS-Web/uams-statamic`'s `scripts/watch-github.mjs`** (blob `30f057cdc`, 29,400
  * bytes, carrying `c69be018f` "Emit a PUSH event when an open ready PR's head moves"), which is
- * the copy that already has the push re-entry `uams-statamic#2338` found missing. Its issue-watching
+ * the copy that already has the push re-entry `uams-statamic-archive#2338` found missing. Its issue-watching
  * feed is **not** ported: it exists there for a catalog consumer this repository does not have, and
  * `.claude/`'s convention is that surface arrives at the point of need rather than ahead of it. See
  * `docs/DECISIONS.md` D-065 and #156.
