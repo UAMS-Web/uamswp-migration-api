@@ -10,18 +10,9 @@
 
 ## Why this is a standing order
 
-**Because the platform requires a pull request on `main` and nothing more, and a required pull request is not a merge gate.** Two organization rulesets, both `active` since 2026-10-05, target `uams-claude-skills`, `uams-statamic`, `uamswp-migration-api` and `wordpress-importer`: `main: no deletion or force push` (rules `deletion` and `non_fast_forward`) and `main: pull request required` (rule `pull_request`). Neither has a bypass list (decided in `uams-statamic#2016`), so the rule binds administrators as well as everyone else, and a direct push to `main` is refused. The `pull_request` rule requires **no approval and no check**: `required_approving_review_count` is `0`, no reviewer is required, no thread resolution is required, and merge, squash and rebase are all allowed. A pull request opened and merged by the same account a minute later, with a red or skipped chain, satisfies it. **State the enforcement, never the flag**: `protected: true` invites the conclusion that something gates the merge, and `branches/main/protection` answering `404` invites the conclusion that nothing is enforced; both readings are wrong here, because the rulesets are neither classic branch protection nor absent. A skipped check is not a passing check, and where remote CI is switched off, `skipped` is the normal appearance, which is precisely what makes it useless as a signal: it looks identical whether the branch is perfect or broken.
+**Because a required pull request, where a repository has one, is not a merge gate.** Read what `main` actually enforces (`gh api repos/{o}/{r}/rulesets`, and `branches/main/protection`) rather than assume it, and **state the enforcement, never the flag**: `protected: true` invites the conclusion that something gates the merge, and `branches/main/protection` answering `404` invites the conclusion that nothing is enforced, while rulesets can make either reading wrong. A skipped check is not a passing check, and where remote CI is switched off, `skipped` is the normal appearance, which is precisely what makes it useless as a signal: it looks identical whether the branch is perfect or broken.
 
-Read the rulesets back rather than assume them. Measured on Windows 11 with `gh`, 2026-10-05, against all four repositories (each listed the same two rulesets, ids `24525022` and `24525074`):
-
-```bash
-gh api repos/UAMS-Web/<repo>/rulesets --jq '.[] | [.id, .name, .enforcement] | @tsv'
-gh api repos/UAMS-Web/<repo>/rulesets/<id> --jq '{enforcement, bypass_actors, rules: [.rules[] | {type, parameters}]}'
-```
-
-For `main: pull request required` the second command printed `"bypass_actors":[]`, `"required_approving_review_count":0` and `"allowed_merge_methods":["merge","squash","rebase"]`. The organization endpoint (`orgs/UAMS-Web/rulesets`) answered `404` for a token without `admin:org`, so read through the repository endpoint above; that it shows bypass actors to every token is not established, and an empty list there is a reading, not the organization settings. A required status check, if one is ever added, reopens that decision.
-
-Remote CI is gated on the org-level `RUN_REMOTE_CI` variable, so the checks panel reads eight `skipped`. `main` is governed by the two organization rulesets above. D-029 held that branch protection and that kill-switch cannot both be on, because a required status check from a skipped job never reports. GitHub's documentation says the opposite (see *Making CI a merge gate* below): a job skipped by an `if:` condition reports success, so with the kill switch on a required check would pass without running rather than stay pending. The rulesets require a pull request and no status check, so neither arises, and the supersession of D-029 is tracked in `uamswp-migration-api#371`.
+Remote CI is gated on the org-level `RUN_REMOTE_CI` variable, so the checks panel reads eight `skipped`. `main` is governed by the two organization rulesets above. D-029 held that branch protection and that kill-switch cannot both be on, because a required status check from a skipped job never reports. GitHub's documentation says the opposite (see *Making CI a merge gate* below): a job skipped by an `if:` condition reports success, so with the kill switch on a required check would pass without running rather than stay pending. The rulesets require a pull request and no status check, so neither arises, and the supersession of D-029 is tracked in `uamswp-migration-api-archive#371`.
 
 History: [Why this is a standing order](../history/pre-merge-check.md#why-this-is-a-standing-order).
 
@@ -31,7 +22,9 @@ So the enforcement mechanism is **this corpus, observed voluntarily**. That is a
 
 A required pull request is not a merge gate, but a required status check is one. Where a repository's CI genuinely runs on every pull request (a public repository, whose Actions minutes are not billed, is the usual case), requiring its checks turns "the gate is voluntary" into a gate the platform enforces. This section is the procedure. The check above still applies at every merge: a required check proves the jobs passed, not that the pull request should land.
 
-**Do not require checks that a kill switch can skip.** GitHub's documentation (*Troubleshooting required status checks*, and *About protected branches*, read 2026-10-19) says a required check is satisfied by a `successful`, `skipped` or `neutral` conclusion, and that a job skipped by an `if:` condition reports success. So in a workflow whose jobs carry an `if:` on a repository or organization variable, switching CI off makes every required check pass without anything running: the gate opens rather than sticking. The opposite case is the one that sticks: a workflow that never starts (a path or branch filter, or `[skip ci]` in the commit message) leaves its required checks `Pending`, and the pull request cannot merge. Both statements are GitHub's documentation, not a measurement taken here.
+**Require one aggregate check, not the individual jobs.** GitHub's documentation (*Troubleshooting required status checks*, and *About protected branches*, read 2026-10-19) says a required check is satisfied by a `successful`, `skipped` or `neutral` conclusion, and that a job skipped by an `if:` condition reports success. So a ruleset that requires each job by name is satisfied by a job that never ran: in a workflow whose jobs carry an `if:` on a repository or organization variable, switching CI off makes every such check pass without anything running, and the gate opens rather than sticking. The opposite case is the one that sticks: a workflow that never starts (a path or branch filter, or `[skip ci]` in the commit message) leaves its required checks `Pending`, and the pull request cannot merge. Both statements are GitHub's documentation, not a measurement taken here.
+
+The shared CI template closes the first case with a final job named `CI` that `needs:` every other job, runs `if: always()`, and fails unless every needed job succeeded. A needed job that was `skipped` or `cancelled` counts as a failure, so the aggregate reports success only when everything ran and passed. A ruleset requires `CI` and nothing per job. How the template's remote-CI switch affects the `CI` check itself (pending, skipped or successful) is not yet measured; that measurement belongs to the template change that adds the aggregate job, and until it is recorded this procedure makes no claim about it.
 
 **1. Read what `main` enforces now.** The first call returns the effective rules from every ruleset that reaches the branch, whichever level defines them; the second lists the repository's own rulesets and the organization rulesets that apply to it:
 
@@ -42,15 +35,15 @@ gh api repos/{o}/{r}/rulesets --jq '.[] | [.id, .name, .source_type, .enforcemen
 
 An empty list from the first means no ruleset reaches `main` at all, not that the read failed: check that a repository known to have rules returns them before reading an empty list as an answer.
 
-**2. Name the checks after a green run, from the check runs, never from the workflow file.** The required context is the name a check run reports: the job's `name:` where it has one, its job id where it does not. Read them off a commit whose workflow has run green:
+**2. Require three names, the same in every repository, and confirm each from a green run.** The required contexts are `CI`, `Attribution footer` and `Closing keywords`. `CI` is the aggregate job described above; the other two are the pull-request-body checks, each in its own workflow. The required context is the name a check run reports: the job's `name:` where it has one, its job id where it does not. Read the names off a commit whose workflows have run green, never off the workflow files, and confirm all three are there:
 
 ```bash
 gh api repos/{o}/{r}/commits/<sha>/check-runs --jq '.check_runs[].name'
 ```
 
-- **Names must be unique across every workflow in the repository.** A ruleset cannot tell two checks with one name apart. Two workflows that each call their job `check` are the common case: rename them (to `Attribution footer` and `Closing keywords`, say) before requiring either. A generic name also risks colliding with a job of the same name in another repository that shares the ruleset.
-- **Renaming or adding a job means updating the ruleset.** Nothing fails when the two drift apart except a pull request that waits for a check name no job reports any more. Say so in the workflow's header comment, where the next person to rename a job will read it.
-- **A chained workflow** (each job `needs:` the one before) skips every later job when one fails. The failed job blocks the merge; the skipped ones count as satisfied, which is harmless only because the failure is required too. Require every job in the chain, not only the last one.
+- **Each of the three names is reported by exactly one job in the repository.** A ruleset cannot tell two checks with one name apart. Two workflows that each call their job `check` are the common case, which is why the body checks are named `Attribution footer` and `Closing keywords`. A generic name also risks colliding with a job of the same name in another repository that shares the ruleset.
+- **The aggregate's `needs:` list is what tracks the other jobs, and the ruleset does not move.** A job added to the workflow is added to the `needs:` list of `CI` in the same change; a job renamed or removed is renamed or removed there. The ruleset keeps its three names through all of it. A job left out of `needs:` is the one way this drifts, and it fails silently: the job still runs and still shows on the pull request, but nothing required depends on it. The list is one place in one file, so a check that every other job id appears in it needs no token able to read rules: the `code-quality` skill's `check-aggregate-needs.mjs`, which the `aggregate-needs` job of its `ci.yml` template runs on every pull request. Say so in the workflow's header comment, where the next person to add a job will read it.
+- **Every job still reports and shows on the pull request.** Only the required list is short. A failing job turns `CI` red, so the pull request is blocked by the aggregate while the failing job's own check names what failed.
 
 **3. Add the checks in a ruleset that reaches this repository alone.** Which kind depends on step 1:
 
@@ -60,7 +53,7 @@ gh api repos/{o}/{r}/commits/<sha>/check-runs --jq '.check_runs[].name'
   gh api -X POST repos/{o}/{r}/rulesets --input ruleset.json
   ```
 
-  with a `ruleset.json` of this shape, one `context` per check name from step 2:
+  with a `ruleset.json` of this shape, carrying the three contexts from step 2:
 
   ```json
   {
@@ -77,7 +70,10 @@ gh api repos/{o}/{r}/commits/<sha>/check-runs --jq '.check_runs[].name'
           "required_review_thread_resolution": false } },
       { "type": "required_status_checks", "parameters": {
           "strict_required_status_checks_policy": false,
-          "required_status_checks": [ { "context": "<job name>" } ] } }
+          "required_status_checks": [
+            { "context": "CI" },
+            { "context": "Attribution footer" },
+            { "context": "Closing keywords" } ] } }
     ]
   }
   ```
@@ -145,9 +141,9 @@ Work these in order. The early steps are cheap and can invalidate the expensive 
 
    | specimen | form | the field said | what merging did |
    | --- | --- | --- | --- |
-   | `uams-statamic#2446` | cross-line, unfenced | *(empty)* | closed a ticket its body declined to close |
-   | `uams-statamic#2482` | same-line, **inside a fence** | one ticket, correct | closed a **second**, unlisted ticket |
-   | `wordpress-importer#1036` | **inside a code span** | (none) | closed its target one second after the merge, same commit |
+   | `uams-statamic-archive#2446` | cross-line, unfenced | *(empty)* | closed a ticket its body declined to close |
+   | `uams-statamic-archive#2482` | same-line, **inside a fence** | one ticket, correct | closed a **second**, unlisted ticket |
+   | `wordpress-importer-archive#1036` | **inside a code span** | (none) | closed its target one second after the merge, same commit |
 
    **So neither a code span nor a fenced block disarms a keyword, and both read as though they do.** `#2482` is the sharper specimen precisely because its field was *populated and accurate*: an empty field invites a second look, a correct-looking one closes the question. Its chain was green on all thirteen jobs.
 
@@ -184,7 +180,7 @@ Work these in order. The early steps are cheap and can invalidate the expensive 
 
 ## A finding in the description alone
 
-When the only finding is in the pull request's description and the gate holds the evidence for the correction (its own measurement, as on `uams-statamic#3078`, where the description stated a count the gate re-measured), the gate **rewrites that passage, says in the verdict what it changed and why, and merges**. Holding the pull request for a sentence the gate can fix costs the author a day and holds up the queue, and the correction is the gate's to make because the evidence is the gate's own. The verdict names the passage before and after, the measurement behind the new text, and the command that produced it, so the author can disagree after the fact.
+When the only finding is in the pull request's description and the gate holds the evidence for the correction (its own measurement, as on `uams-statamic-archive#3078`, where the description stated a count the gate re-measured), the gate **rewrites that passage, says in the verdict what it changed and why, and merges**. Holding the pull request for a sentence the gate can fix costs the author a day and holds up the queue, and the correction is the gate's to make because the evidence is the gate's own. The verdict names the passage before and after, the measurement behind the new text, and the command that produced it, so the author can disagree after the fact.
 
 **A description finding that needs the author's knowledge is still handed back.** That covers intent, a design choice, a claim about work done elsewhere, and anything the gate could only guess at. If the correct text is not something the gate measured or read, the pull request goes back with the finding, exactly as for a failing job.
 
@@ -208,8 +204,6 @@ The [`local-ci`](../skills/local-ci/SKILL.md) skill ships the one-step form: `po
 
 **`handed-back` comes off when the pull request RE-ENTERS the queue (a push to the head) or a person edits its description, not when the author says it is ready, and a workflow does the removal, not the gate.** The workflow runs on `pull_request` `synchronize` and on `edited` for a body change by a person, and removes the label when it is present. The gate removed it by hand before that, and a hand removal is the step that gets missed: a pull request keeps the label after its author has pushed and drops out of the queue count while waiting to be gated. That asymmetry is the whole reason the label is better than the flag it replaces: a draft flip cleared when the author flipped back to ready, and flipping to ready *is* how a re-gate is requested, so the old marker went away before the finding was necessarily addressed. It never marked *a finding is outstanding*; it marked *the author has not responded yet*. The label clears on the state change that actually happened.
 
-The operator settled the label for all three gate repositories on 2026-09-09 (`uams-statamic#2323`, `wordpress-importer#1033`, `uamswp-migration-api` D-068). Two pull requests in `uams-statamic` (#2619 and #2662) kept the label after their authors had pushed, which is the missed removal the workflow replaced.
-
 Here the workflow is [`.github/workflows/clear-handed-back.yml`](../../.github/workflows/clear-handed-back.yml) (#330).
 
 **The workflow ships as a template** in the [`handed-back-label`](../skills/handed-back-label/SKILL.md) skill, which a repository copies to `.github/workflows/clear-handed-back.yml`, together with a drift check that fails when the copy differs from the template or is missing (UAMS-Web/uams-claude-skills#57).
@@ -231,8 +225,6 @@ gh api repos/{o}/{r}/issues/<n> --jq '[.labels[].name]'   # read back: everythin
 **The author never applies or removes it by hand** (a push or a description edit is what removes it) and that is the same boundary as the flip, running the other way. The gate stopped mutating `draft`, which the author owns; clearing `handed-back` would forge the gate's signal: it asserts *this re-entered the queue* when it has not. An author who believes a pull request is wrongly marked says so to the gate, and leaves the label alone. **Its absence is not a green light either**: it means *not currently handed back*, not *gated and clean*, and its presence blocks nothing: push whenever ready, and the push is what re-enters the pull request.
 
 **It is a gate marker and nothing more.** Whether anything outside the gate reads or applies it is undecided and out of scope here.
-
-The conflicted-push behavior was measured in `uams-statamic` on #2675 with scratch pull requests against a scratch base, 2026-09-30: a push that kept a pull request conflicted produced no run of any workflow within three minutes; the push that resolved it removed the label; a clean control removed it too.
 
 ## Adversarial review at the merge
 
