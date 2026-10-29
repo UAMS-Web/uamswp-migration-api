@@ -366,7 +366,7 @@ it('runs every chained job on both Linux and Windows', function (): void {
 
     foreach (ciChainedJobs() as $job => $body) {
         $matrix = preg_match('/^        os: \[(.*)\]$/m', $body, $matches) === 1
-            ? array_map('trim', explode(',', $matches[1]))
+            ? array_map(trim(...), explode(',', $matches[1]))
             : [];
 
         if ($matrix !== ['ubuntu-latest', 'windows-latest']
