@@ -732,7 +732,8 @@ jobs:
           tar --force-local -xzf "$RUNNER_TEMP/wordpress.tar.gz" -C "$RUNNER_TEMP"
 
       # The Linux leg's database is the service above. The action starts MySQL
-      # with a passwordless root, the same credentials the service provides.
+      # with root and an empty password, the credentials the service provides.
+      # cspell:ignore shogo
       - name: Set up MySQL 8.0 (Windows)
         if: runner.os == 'Windows'
         uses: shogo82148/actions-setup-mysql@v1
