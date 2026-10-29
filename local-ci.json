@@ -100,6 +100,13 @@
       "always": true
     },
     {
+      "name": "mutate-ignore-breadth",
+      "_note": "Measures each @pest-mutate-ignore with the installed pest-plugin-mutate and fails naming any that removes other than one mutant per mutator it names (#31). Local only for now: ci.yml is being changed by #25, and the step lands there after it. No vendor requirement, for the reason the spell job gives: an absent plugin fails instead. The paths are named because the default `tests` walks into tests/Integration/vendor, whose pest-plugin-mutate carries markers of its own.",
+      "run": "php .claude/skills/pest-testing/scripts/check-mutate-ignore-breadth.php includes tests/Unit tests/Support tests/Integration/Feature tests/Integration/Mutate tests/Integration/bootstrap.php tests/Integration/Pest.php tests/Integration/wp-tests-config.php",
+      "always": true,
+      "requires": [".claude/skills/pest-testing/scripts/check-mutate-ignore-breadth.php"]
+    },
+    {
       "name": "pest",
       "_note": "The unit suite from the root setup, then the Integration suite from tests/Integration four times: as a network and as a single site, each once without and once with the shared secret defined. See scripts/run-pest-suites.php.",
       "run": "php scripts/run-pest-suites.php",
