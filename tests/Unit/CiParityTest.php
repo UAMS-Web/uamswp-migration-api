@@ -84,8 +84,6 @@ function ciLocalOnlyJobs(): array
     return [
         // Installs into the runner's reused slot; Actions installs cold every job.
         'dependencies',
-        // Until ci.yml gains the step after #25 changes the workflow (#31).
-        'mutate-ignore-breadth',
     ];
 }
 
