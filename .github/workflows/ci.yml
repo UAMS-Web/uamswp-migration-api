@@ -91,6 +91,20 @@ defaults:
 # jobs rather than the max. `local-ci.json` sets `chain`, so the local run also
 # stops at the first failure.
 #
+# TWO OPERATING SYSTEMS (#25, D-108). Every link in the chain runs on
+# `ubuntu-latest` and `windows-latest`, as a matrix on `os` that is not
+# fail-fast. `needs:` names a job id, so each link waits for both legs of the
+# one before it, and `CI` reads each job's combined result, which is `success`
+# only when both legs succeeded. `tests/Unit/CiParityTest.php` fails when a job
+# drops a leg. The Windows leg is there to catch what only Windows does (paths,
+# command-line and filter limits, console behavior) on the pull request rather
+# than on the next Windows workstation. Standard runners cost no minutes on a
+# public repository; the cost is wall-clock, since a link waits for its slower
+# leg. Two steps differ by operating system: a Windows runner cannot run
+# service containers, so the `pest` job's MySQL is a service on Linux and a
+# setup step on Windows, and `run:` defaults to bash so both legs run the same
+# commands. The `CI` job itself runs once, on Linux.
+#
 # Two deliberate differences in the local run: every job is always selected
 # rather than chosen from the diff, and Pint checks the whole tree rather than
 # the changed files, which is stricter and needs no diff.
@@ -725,11 +739,16 @@ jobs:
 
       - name: Download WordPress ${{ steps.wordpress.outputs.slug }}
         run: |
+          # On Windows RUNNER_TEMP is `D:\a\_temp`, which Git Bash's GNU tar
+          # cannot open (#25), so the path is converted to `/d/a/_temp` there.
+          # Linux has no cygpath and needs no conversion.
+          temp="$RUNNER_TEMP"
+          if command -v cygpath > /dev/null; then
+            temp=$(cygpath -u "$RUNNER_TEMP")
+          fi
           curl -sSfL "https://wordpress.org/wordpress-${{ steps.wordpress.outputs.slug }}.tar.gz" \
-            -o "$RUNNER_TEMP/wordpress.tar.gz"
-          # --force-local: on Windows RUNNER_TEMP is `D:\a\_temp`, and GNU tar
-          # reads a colon in an archive name as a remote host.
-          tar --force-local -xzf "$RUNNER_TEMP/wordpress.tar.gz" -C "$RUNNER_TEMP"
+            -o "$temp/wordpress.tar.gz"
+          tar -xzf "$temp/wordpress.tar.gz" -C "$temp"
 
       # The Linux leg's database is the service above. The action starts MySQL
       # with root and an empty password, the credentials the service provides.
