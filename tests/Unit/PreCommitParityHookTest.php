@@ -57,13 +57,27 @@ function preCommitExecPortable(string $command): array
 }
 
 /**
+ * The `cd` that starts a fixture command, for the shell `exec()` runs it in.
+ *
+ * On Windows that shell is `cmd.exe`, whose `cd` changes the directory but not
+ * the drive unless it is given `/d`. A runner's temp directory is on `C:` and
+ * its checkout on `D:`, so a bare `cd` left every fixture command running in
+ * the checkout itself: `git config` wrote to its `.git/config` and `git add -A`
+ * staged its files (#25).
+ */
+function preCommitCd(string $dir): string
+{
+    return (\PHP_OS_FAMILY === 'Windows' ? 'cd /d ' : 'cd ').escapeshellarg($dir);
+}
+
+/**
  * Run a command in a fixture repository, asserting it succeeded.
  *
  * @return string Combined output.
  */
 function preCommitFixtureRun(string $cwd, string $command): string
 {
-    [$exitCode, $combined] = preCommitExecPortable('cd '.escapeshellarg($cwd).' && '.$command);
+    [$exitCode, $combined] = preCommitExecPortable(preCommitCd($cwd).' && '.$command);
 
     if ($exitCode !== 0) {
         throw new RuntimeException(sprintf('Fixture setup failed: %s => %s', $command, $combined));
@@ -105,7 +119,7 @@ function preCommitHookRun(string $dir): array
 {
     $hook = \dirname(__DIR__, 2).'/.githooks/pre-commit';
 
-    $command = 'cd '.escapeshellarg($dir).' && sh '.escapeshellarg($hook);
+    $command = preCommitCd($dir).' && sh '.escapeshellarg($hook);
 
     return preCommitExecPortable($command);
 }
@@ -148,7 +162,7 @@ function preCommitFixtureCleanup(string $dir): void
  */
 function preCommitFixtureAttempt(string $cwd, string $command): void
 {
-    preCommitExecPortable('cd '.escapeshellarg($cwd).' && '.$command);
+    preCommitExecPortable(preCommitCd($cwd).' && '.$command);
 }
 
 /**
