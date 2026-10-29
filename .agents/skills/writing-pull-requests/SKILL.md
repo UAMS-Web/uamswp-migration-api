@@ -128,10 +128,27 @@ green checks panel.
   Each PR's test plan covers its own base branch's environment; see the **`## Test plan` checklist** below.
 - **Open as draft unless it is ready to validate; flip draft → ready when it becomes ready.** A
   PR whose branch still needs work opens with `gh pr create --draft`; `gh pr ready <n>` flips it
-  once the change is genuinely ready to validate. A docs-only PR: no code, test, or build
-  surface for the gate to exercise (a `.claude/` skill or rule, a `docs/` edit): is ready on
-  creation and opens non-draft. Never present a PR as ready-to-merge before its validation path
-  can actually run against it, and never flip to ready while you know the branch is unfinished.
+  once the change is genuinely ready to validate. Where remote CI does not run on every pull
+  request, a docs-only PR: no code, test, or build surface for the gate to exercise (a `.claude/`
+  skill or rule, a `docs/` edit): is ready on creation and opens non-draft. Never present a PR as
+  ready-to-merge before its validation path can actually run against it, and never flip to ready
+  while you know the branch is unfinished.
+- **In a public repository, the draft's remote checks are the pre-PR check.** Its `ci.yml` runs on
+  every pull request, drafts included (the `RUN_REMOTE_CI` switch reaches private repositories
+  only), and the local runner's jobs mirror it. So run nothing locally as a pre-PR check: push the
+  branch and open the pull request as a draft, docs-only ones included, and flip it to ready only
+  when every remote check on its head is green. When a check is red, fix it and push to the same
+  branch; the draft re-runs, and a new pull request for the same change is never the answer. Keep
+  running a test locally while writing it, and keep a local run for the four cases remote CI
+  cannot cover:
+  - a change whose acceptance criteria name Windows or another platform remote CI does not run
+    (it runs on Ubuntu only);
+  - the full mutation run a test-coverage ticket records (remote CI runs one smoke path);
+  - a run that needs a loaded WordPress install or the importer's host application;
+  - any repository with no remote CI workflow, including a private one.
+
+  The pre-merge validation of a ready pull request is unchanged: the gate still runs it
+  (UAMS-Web/uams-claude-skills#366).
 - **When a merge order is required, state it in the body: in the PR that must merge second.**
   File-disjoint PRs need no ordering, but when PRs must merge in sequence: a shared-surface
   branch before a dependent one, a submodule companion before its pointer bump, or a cross-repo
@@ -139,17 +156,17 @@ green checks panel.
   first. Put it on the *dependent* PR, where whoever is about to merge will read it, rather than
   only on the one that goes first. See **Companion PRs and merge order** below.
 
-**Remote CI does not gate here.** `.github/workflows/ci.yml` is behind the org-level `RUN_REMOTE_CI` Actions variable, so its jobs report `skipped`: an all-`skipped` checks panel is expected rather than alarming, and the local run is the real evidence. Validation runs through the [`local-ci`](../local-ci/SKILL.md) skill.
+**Remote CI runs here on every pull request.** This repository is public, so the org-level `RUN_REMOTE_CI` Actions variable, which is scoped to private repositories, does not reach it, and `.github/workflows/ci.yml` reports real results on drafts and ready pull requests alike (`UAMS-Web/uamswp-migration-api#7`, `UAMS-Web/wordpress-importer#163`, `UAMS-Web/uams-statamic#337`). Validation of a ready pull request runs through the [`local-ci`](../local-ci/SKILL.md) skill.
 
 **A red hand-back comes back as a comment and a label, not as a draft flip.** The gate comments its verdict on the pull request and applies the `handed-back` label; it never flips the pull request to draft, because `ready → draft` is the author's own signal. The label comes off when the pull request re-enters the queue: a push to its head, and a workflow under `.github/workflows/` does that removal on the push itself, so the author never applies or removes it by hand. Watch for the verdict comment, fix, and push; the push is what re-arms the gate.
 
-**"Ready for review" means the CI chain has been run against the branch and passed.** That is `npm run ci:local -- --branch <branch> --fetch`, not `composer ci`: the latter is a subset of three of the eight jobs. Record the result in `## Verification`, naming the commit the runner printed.
+**"Ready for review" means every remote check on the head is green.** The pull request's remote run is the evidence, and the local chain does not gate a merge here (`UAMS-Web/uamswp-migration-api#7`). For one of the four local cases above, run the chain with `npm run ci:local -- --branch <branch> --fetch`, not `composer ci`, which is a subset of three of its jobs, and record the result in `## Verification`, naming the commit the runner printed.
 
 ## Spell-check new words before opening
 
-Where the repository runs cspell: a `cspell.json`, a `project-words.txt` dictionary, and a `spell` job in its CI chain: a word the checker does not recognize fails validation and forces a *separate* `project-words.txt` PR after the fact. Catch it in the PR that introduces the word instead. This applies to docs-only PRs too: the ones most likely to add new words, and the ones that open non-draft (above), so there is no draft window in which CI would otherwise catch it first.
+Where the repository runs cspell: a `cspell.json`, a `project-words.txt` dictionary, and a `spell` job in its CI chain: a word the checker does not recognize fails validation and forces a *separate* `project-words.txt` PR after the fact. Catch it in the PR that introduces the word instead. Where remote CI does not run on every pull request, this applies to docs-only PRs too: the ones most likely to add new words, and the ones that open non-draft (above), so there is no draft window in which CI would otherwise catch it first.
 
-If you have added or edited any prose or identifiers (comments, docs, test names, anything cspell scans), run the spell check before opening the PR and reconcile every flagged word. For each one, decide: do **not** reflexively allow-list:
+If you have added or edited any prose or identifiers (comments, docs, test names, anything cspell scans), run the spell check before opening the PR and reconcile every flagged word. **In a public repository the draft's remote `spell` job is that check**: open the draft, and reconcile every word it flags before flipping to ready. For each one, decide: do **not** reflexively allow-list:
 
 - **A genuine misspelling** → fix it in source.
 - **A British spelling in first-party prose** → fix it to American, per [`american-english-prose`](../rule-american-english-prose/SKILL.md), which owns the convention, its arbiter, and the reasons that justify overriding it in the dictionary. Keep British only where it is baked into something you do not control: a WordPress core hook name, a third-party option key.
@@ -497,7 +514,7 @@ Every PR ends with a `## Test plan` GitHub task list. Conventions:
   data set).
 - When the PR has a companion at all (a submodule pointer, a fixtures bump, a sibling-repo PR, or a release the consumer needs), include a `[ ]` item for the gated follow-through. Note CI is expected-red until the companion merges **when the branch depends on it**; when it does not, say so explicitly, because then nothing goes red and the item is the only thing left holding the bump. See **Companion PRs and merge order** above.
 
-The canonical gate line here is: `- [x] \`npm run ci:local\` green on \`<sha>\` (load guard, \`composer validate\`, cspell, Pint, Rector, PHPStan, Pest).` A deferred `[ ]` item most often covers anything needing a second site in the network (#12) or the production data set.
+The canonical gate line here is: `- [x] Remote checks green on \`<sha>\` (\`CI\`, \`Attribution footer\`, \`Closing keywords\`).` The pull request's remote run is the evidence, and the local chain does not gate a merge (`UAMS-Web/uamswp-migration-api#7`). A deferred `[ ]` item most often covers anything needing a second site in the network (#12) or the production data set.
 
 ## Tone and voice
 

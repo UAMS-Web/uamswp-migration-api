@@ -25,6 +25,8 @@ description: >-
 
 Private repositories run their checks on the developer's machine, not in GitHub Actions: Actions minutes on private repositories bill to the organization's shared pool, and that budget is not spent on remote CI. The shared runner is what runs them.
 
+A public repository is different: `RUN_REMOTE_CI` does not reach it, so its `ci.yml` runs on every pull request, drafts included, and an author does not run this runner as a pre-PR check there. The draft's remote checks are that check, as the `writing-pull-requests` skill's *Draft state and merge order* says, which also names the cases that still run locally. Running the runner to validate a ready pull request before it merges is unchanged.
+
 - **`.claude/skills/local-ci/local-ci.mjs`** is the runner: one file, no dependencies, Node 20 or newer, the same on macOS, Linux and Windows. It is synced from `UAMS-Web/uams-claude-skills` and is identical in every repository that has it. Do not edit it here; change it in the source repository.
 - **`post-verdict.mjs`** posts a verdict comment and, on a hand-back, applies the `handed-back` label in the same run, with its tests in UAMS-Web/uams-claude-skills (not synced): see [Posting the verdict and the hand-back label](#posting-the-verdict-and-the-hand-back-label-post-verdictmjs).
 - **`watch-github.mjs`** is the pull request watcher, with its tests in UAMS-Web/uams-claude-skills (not synced): see [Watching pull requests](#watching-pull-requests-watch-githubmjs). The banned-glyph scanner its opt-in scan uses is `glyphs.mjs` in the `writing-comments` skill, which every target receives.
