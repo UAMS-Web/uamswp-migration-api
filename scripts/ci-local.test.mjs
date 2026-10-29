@@ -30,7 +30,10 @@ describe('runnerArgs', () => {
     })
 
     it('puts the slot beside the primary when invoked from a linked worktree', () => {
-        const dir = realpathSync(mkdtempSync(join(tmpdir(), 'ci-local-')))
+        // `.native`: on Windows the temp directory can be an 8.3 short name
+        // (`RUNNER~1`), which only the native call expands to the long name git
+        // reports (#25).
+        const dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'ci-local-')))
         const git = (cwd, ...args) => {
             const r = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8' })
             assert.equal(r.status, 0, r.stderr)

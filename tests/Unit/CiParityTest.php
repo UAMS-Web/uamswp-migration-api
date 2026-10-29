@@ -355,6 +355,34 @@ it('aggregates every chained job into the required CI check', function (): void 
         ->and($needed[1])->toBe(ciWorkflowChain());
 });
 
+it('runs every chained job on both Linux and Windows', function (): void {
+    // `CI` needs each job by id, and a matrix job reports `success` only when
+    // every leg succeeded, so the Windows leg is required exactly as long as
+    // each job keeps it in its matrix (#25). A job that drops it, or runs on a
+    // fixed runner instead, takes Windows out of the gate with nothing failing.
+    // Fail-fast would cancel the other leg on a failure, and a cancelled leg
+    // reports nothing about its own operating system. `exclude` and `include`
+    // reshape the matrix below the `os` line, and `continue-on-error` lets a
+    // failed leg pass, so each of those takes a leg out with that line intact.
+    $missingLeg = [];
+
+    foreach (ciChainedJobs() as $job => $body) {
+        $matrix = preg_match('/^        os: \[(.*)\]$/m', $body, $matches) === 1
+            ? array_map(trim(...), explode(',', $matches[1]))
+            : [];
+
+        if ($matrix !== ['ubuntu-latest', 'windows-latest']
+            || preg_match('/^    runs-on: \$\{\{ matrix\.os \}\}$/m', $body) !== 1
+            || preg_match('/^      fail-fast: false$/m', $body) !== 1
+            || preg_match('/^\s+(exclude|include|continue-on-error):/m', $body) === 1) {
+            $missingLeg[] = $job;
+        }
+    }
+
+    expect(ciChainedJobs())->not->toBe([])
+        ->and($missingLeg)->toBe([]);
+});
+
 it('runs the same jobs, in the same order, locally and remotely', function (): void {
     // The one assertion that actually catches drift: a job added to ci.yml and
     // not to the runner is a job the local gate never runs, and while
