@@ -74,13 +74,14 @@ defaults:
 #   pint       -> "Determine changed PHP files" + "Run Pint on changed files"
 #   rector     -> "Run Rector (gating profile, dry-run)"
 #   phpstan    -> "Run PHPStan"
+#   mutate-ignore-breadth -> "Measure each mutation annotation's breadth"
 #   pest       -> "Run the Pest suites"
 #   node-test  -> "Run the script tests"
 #
 # JOB CHAIN (cost-ordered): the jobs run as a strict sequential chain via
 # `needs:`, shortest -> longest:
 #
-#   load-guard -> lint-floor -> validate -> floor-functions -> glyph -> synced-files -> handed-back-workflow -> download-archive -> aggregate-needs -> spell -> pint -> rector -> phpstan -> pest -> node-test
+#   load-guard -> lint-floor -> validate -> floor-functions -> glyph -> synced-files -> handed-back-workflow -> download-archive -> aggregate-needs -> spell -> pint -> rector -> phpstan -> mutate-ignore-breadth -> pest -> node-test
 #
 # node-test runs LAST despite needing neither Composer nor npm, matching where
 # wordpress-importer's reference implementation places it, ported rather than
@@ -650,6 +651,56 @@ jobs:
       - name: Run PHPStan
         run: composer stan
 
+  mutate-ignore-breadth:
+    name: Mutation annotation breadth on ${{ matrix.os }}
+    strategy:
+      # Every link runs on both operating systems (#25). Not fail-fast, so a
+      # failure on one still reports the other, and `needs:` waits for both legs.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    # CI chain: runs only after PHPStan passes.
+    needs: phpstan
+    # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
+    if: vars.RUN_REMOTE_CI != 'false'
+    # Measures each `@pest-mutate-ignore` with the installed pest-plugin-mutate
+    # and fails, naming the file and line, when one removes other than one
+    # mutant per mutator it names (#31). The text check cannot see either case:
+    # an annotation that removes more than its survivor, or one that removes
+    # nothing. It reads source only, so it needs the root install and no
+    # database.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+
+      - name: Determine Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config --global cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # PARITY: mirrored by the mutate-ignore-breadth job in local-ci.json,
+      # with the same paths. They are named because the default `tests` walks
+      # into tests/Integration/vendor, which a cold checkout never has but a
+      # reused local slot does.
+      - name: Measure each mutation annotation's breadth
+        run: php .claude/skills/pest-testing/scripts/check-mutate-ignore-breadth.php includes tests/Unit tests/Support tests/Integration/Feature tests/Integration/Mutate tests/Integration/bootstrap.php tests/Integration/Pest.php tests/Integration/wp-tests-config.php
+
   pest:
     name: Pest (Unit + Integration) on ${{ matrix.os }}
     strategy:
@@ -661,7 +712,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     # CI chain: runs LAST — the only job needing a database and a WordPress
     # tree, so everything cheaper gates it.
-    needs: phpstan
+    needs: mutate-ignore-breadth
     # Budget kill-switch (see the RUN_REMOTE_CI note in the header).
     if: vars.RUN_REMOTE_CI != 'false'
     # The Integration suite boots real WordPress through `wp-phpunit` (D-021) against
@@ -852,6 +903,7 @@ jobs:
       - pint
       - rector
       - phpstan
+      - mutate-ignore-breadth
       - pest
       - node-test
     if: always()
