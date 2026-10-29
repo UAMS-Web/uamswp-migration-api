@@ -74,7 +74,11 @@ declare(strict_types=1);
  *
  *     Run from the project root. A path is a directory searched for `*.php`, or a single
  *     file of any extension; paths are reported relative to the root as given. The default
- *     is those of `app`, `src`, `includes` and `tests` that exist. MUTATE_IGNORE_ROOT
+ *     is those of `app`, `src`, `includes` and `tests` that exist. A search does not enter a
+ *     `vendor/` or `node_modules/` directory below the path searched, at any depth, so a
+ *     second Composer install such as `tests/Integration/vendor/` is not read as this
+ *     project's code. A path named on the command line is read even when it is such a
+ *     directory, or is inside one. MUTATE_IGNORE_ROOT
  *     overrides the root and MUTATE_IGNORE_VENDOR_DIR the vendor directory, default
  *     `<root>/vendor`, whose `autoload.php` and `pestphp/pest-plugin-mutate` are read.
  *
@@ -100,6 +104,13 @@ use PhpParser\Parser;
 const BREADTH_MARKER = '@pest-mutate-ignore';
 const BREADTH_INERT = '@pest-mutate-inert';
 const BREADTH_DEFAULT_BASELINE = 'tests/mutate-ignore-breadth.baseline.json';
+
+/**
+ * Directories the walk does not enter below a path it searches: another Composer or npm
+ * install, such as a second setup's `tests/Integration/vendor/`, holds a dependency's
+ * markers rather than this project's.
+ */
+const BREADTH_SKIPPED_DIRECTORIES = ['vendor', 'node_modules'];
 const BREADTH_CONTROL_MUTATOR = 'GreaterToGreaterOrEqual';
 const BREADTH_CONTROL_OTHER = 'PlusToMinus';
 
@@ -577,7 +588,13 @@ foreach ($roots as $path) {
         breadthFail("not a file or directory: {$path}");
     }
 
-    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS)) as $file) {
+    // Below the searched path, skip installed dependency trees at any depth
+    $walk = new RecursiveCallbackFilterIterator(
+        new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
+        static fn (SplFileInfo $entry): bool => ! ($entry->isDir() && in_array($entry->getFilename(), BREADTH_SKIPPED_DIRECTORIES, true)),
+    );
+
+    foreach (new RecursiveIteratorIterator($walk) as $file) {
         if ($file instanceof SplFileInfo && $file->isFile() && $file->getExtension() === 'php') {
             $files[] = breadthNormalizePath($file->getPathname(), $root);
         }
