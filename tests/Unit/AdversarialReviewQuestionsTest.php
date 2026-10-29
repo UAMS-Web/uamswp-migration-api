@@ -57,10 +57,10 @@ it('names the WordPress forms of a masking default', function () use ($adversari
     expect($section)->toContain('is_wp_error()', 'get_option()', 'get_post_meta()');
 });
 
-it("keeps the auth gate's identical 401 out of the error-message question", function () use ($adversarialReviewRulePath): void {
+it("keeps the auth gate's uniform 401 out of the error-message question", function () use ($adversarialReviewRulePath): void {
     $section = adversarialReviewSubsection(adversarialReviewRule($adversarialReviewRulePath), 'Error handling');
 
-    expect($section)->toContain('identical `401`');
+    expect($section)->toContain('uniform `401` is deliberate');
 });
 
 it('rates a missing test by the regression it would catch', function () use ($adversarialReviewRulePath): void {
