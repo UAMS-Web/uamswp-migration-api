@@ -28,6 +28,12 @@
       "requires": ["bin:node"]
     },
     {
+      "name": "download-archive",
+      "run": "node .claude/skills/download-archive-check/check-download-archive.mjs",
+      "always": true,
+      "requires": ["bin:node", "bin:git"]
+    },
+    {
       "name": "pint",
       "run": "vendor/bin/pint --test",
       "paths": ["**/*.php", "!vendor/**", "pint.json", "composer.lock"]

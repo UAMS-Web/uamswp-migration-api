@@ -89,7 +89,7 @@ Where the repository has the shared local CI runner, one job parses every shippe
 
 With the Pest major chosen by the development PHP, the floor no longer keeps a repository off Pest. What still can is a dependency that pins PHPUnit (above). Such a repository keeps its existing PHPUnit suite, and its ticket names the pin and what would lift it. A WordPress repository's Integration suite is not this case: it is on PHPUnit 9.6 by design, in its own setup, beside Pest 5.
 
-**This repository's Integration suite is the one exception: it stays on Pest 3 / PHPUnit 11**, in `tests/Integration/`'s own Composer setup, by decision (UAMS-Web/uamswp-migration-api#397, D-094 there). Its 34 files are Pest closures run against real WordPress, and its mutation testing of `Pagination`, `Config` and `Auth` runs through Pest `--mutate`, so it needs Pest wherever those tests live. WordPress' test library makes one call to a PHPUnit API that PHPUnit 10 removed, and the repository's `tests/Support/WordPressTestCase.php` overrides that method (measured on macOS at `562e423`: 361 passed, 10 skipped). The exception ends when the plugin is deleted at the end of the migration, or sooner if a later decision rewrites the suite for PHPUnit 9.6.
+**This repository's Integration suite is the one exception: it stays on Pest 3 / PHPUnit 11**, in `tests/Integration/`'s own Composer setup, by decision (UAMS-Web/uamswp-migration-api-archive#397, D-094 there). Its 34 files are Pest closures run against real WordPress, and its mutation testing of `Pagination`, `Config` and `Auth` runs through Pest `--mutate`, so it needs Pest wherever those tests live. WordPress' test library makes one call to a PHPUnit API that PHPUnit 10 removed, and the repository's `tests/Support/WordPressTestCase.php` overrides that method (measured on macOS at `562e423`: 361 passed, 10 skipped). The exception ends when the plugin is deleted at the end of the migration, or sooner if a later decision rewrites the suite for PHPUnit 9.6.
 
 The PHPUnit 9 plugin template that served repositories with a floor below PHP 8.2 was retired with UAMS-Web/uams-claude-skills#125: the floor is now 8.2 everywhere, and its Integration layer is the plugin template's `tests/Integration/` setup.
 
@@ -315,7 +315,7 @@ Where untested code cannot be loaded in isolation (definitions and registrations
 
 ## Full coverage
 
-"Bring test coverage to full" means the bar below (recorded while scoping UAMS-Web/uams-statamic#2834; UAMS-Web/uams-claude-skills#9). Every repository's coverage follow-up closes against this section. A bare line-% floor or a literal `100%` mutation score is not the bar.
+"Bring test coverage to full" means the bar below (recorded while scoping UAMS-Web/uams-statamic#255; UAMS-Web/uams-claude-skills#9). Every repository's coverage follow-up closes against this section. A bare line-% floor or a literal `100%` mutation score is not the bar.
 
 ### Population
 
@@ -431,8 +431,6 @@ A WordPress plugin or theme runs its two suites as two jobs, each in its own pro
 ```
 
 The Integration job needs the test database and reads the same `WP_TESTS_*` variables from the environment the runner is started in. It runs PHPUnit through `php` so the runner's resolved PHP runs it, the same PHP as the Unit job. A repository whose Composer `test` script selects testsuites or processes differently runs that command instead (the `run` of each job is the command the repository's own scripts run). A repository on PHPUnit uses `vendor/bin/phpunit`.
-
-This repository keeps its own `scripts/local-ci.mjs`, which already runs its test jobs, until its maintainers record whether to move to the shared runner (UAMS-Web/uams-claude-skills#11). The `local-ci.json` entries above do not apply here until then.
 
 ## Forks of vendor plugins
 

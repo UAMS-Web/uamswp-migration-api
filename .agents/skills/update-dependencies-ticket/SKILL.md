@@ -122,9 +122,7 @@ node .claude/skills/local-ci/local-ci.mjs      # full job parity; see the local-
 
 The runner and its options are the [`local-ci`](../local-ci/SKILL.md) skill.
 
-This repository's gate is its own runner, `node scripts/local-ci.mjs --branch <branch>` (the
-`local-ci` skill's *Repositories with their own runner*). It checks the branch out into its CI
-tree, and a slot still holding the branch blocks that checkout, so release before handing off.
+This repository's gate is the shared runner, started through `npm run ci:local` (`node scripts/ci-local.mjs`); `local-ci.json` is its job list.
 
 Those runs can be multi-minute. Bound them per the
 [`long-running-commands`](../rule-long-running-commands/SKILL.md) rule, and note **macOS ships no
@@ -144,7 +142,7 @@ its `vendor/` returns to `main`'s lock files.
 
 ## The Dependabot configuration
 
-`templates/dependabot.yml` is the version-update configuration this skill assumes: `composer` and `github-actions` on a weekly schedule against `main`, with minor and patch updates grouped per ecosystem so a week produces a few pull requests, and a major update left in a pull request of its own. The `github-actions` entry lists both `/` and `/.github/actions/setup`, so the composite action the `code-quality` skill's `templates/ci.yml` uses is kept current as well. Copy it once to `.github/dependabot.yml`, and drop the `npm` entry in a repository with no `package.json`. The sync never writes `.github/`, so an existing file is never overwritten.
+`templates/dependabot.yml` is the version-update configuration this skill assumes: `composer` and `github-actions` on a weekly schedule against `main`, with minor and patch updates grouped per ecosystem so a week produces a few pull requests, and a major update left in a pull request of its own. The `github-actions` entry lists both `/` and `/.github/actions/setup`, so the composite action the `code-quality` skill's `templates/ci.yml` uses is kept current as well. Copy it once to `.github/dependabot.yml`, and drop the `npm` entry in a repository with no `package.json`. A repository that holds a package at a deliberate version adds an `ignore` list to the entry that reads it, following the commented example in the template, and records the decision beside each entry; `UAMS-Web/uamswp-migration-api` does this for `wp-phpunit/wp-phpunit` (only a major held) and for the ACF fallback (held whole), and lists each pin in both of its composer entries. An ignored dependency also leaves its group. The sync never writes `.github/`, so an existing file is never overwritten.
 
 ## The DRY line
 
