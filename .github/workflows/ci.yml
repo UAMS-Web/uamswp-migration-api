@@ -100,10 +100,12 @@ defaults:
 # command-line and filter limits, console behavior) on the pull request rather
 # than on the next Windows workstation. Standard runners cost no minutes on a
 # public repository; the cost is wall-clock, since a link waits for its slower
-# leg. Two steps differ by operating system: a Windows runner cannot run
-# service containers, so the `pest` job's MySQL is a service on Linux and a
-# setup step on Windows, and `run:` defaults to bash so both legs run the same
-# commands. The `CI` job itself runs once, on Linux.
+# leg. `run:` defaults to bash on both, so both legs run the same commands.
+# Two things in the `pest` job differ by operating system: a Windows runner
+# cannot run service containers, so MySQL is a service on Linux and two
+# Windows-only steps (set up MySQL, create the database) on Windows; and the
+# WordPress download converts `RUNNER_TEMP` with `cygpath` where it exists.
+# The `CI` job itself runs once, on Linux.
 #
 # Two deliberate differences in the local run: every job is always selected
 # rather than chosen from the diff, and Pint checks the whole tree rather than

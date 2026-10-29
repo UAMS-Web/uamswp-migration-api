@@ -361,7 +361,9 @@ it('runs every chained job on both Linux and Windows', function (): void {
     // each job keeps it in its matrix (#25). A job that drops it, or runs on a
     // fixed runner instead, takes Windows out of the gate with nothing failing.
     // Fail-fast would cancel the other leg on a failure, and a cancelled leg
-    // reports nothing about its own operating system.
+    // reports nothing about its own operating system. `exclude` and `include`
+    // reshape the matrix below the `os` line, and `continue-on-error` lets a
+    // failed leg pass, so each of those takes a leg out with that line intact.
     $missingLeg = [];
 
     foreach (ciChainedJobs() as $job => $body) {
@@ -371,7 +373,8 @@ it('runs every chained job on both Linux and Windows', function (): void {
 
         if ($matrix !== ['ubuntu-latest', 'windows-latest']
             || preg_match('/^    runs-on: \$\{\{ matrix\.os \}\}$/m', $body) !== 1
-            || preg_match('/^      fail-fast: false$/m', $body) !== 1) {
+            || preg_match('/^      fail-fast: false$/m', $body) !== 1
+            || preg_match('/^\s+(exclude|include|continue-on-error):/m', $body) === 1) {
             $missingLeg[] = $job;
         }
     }
