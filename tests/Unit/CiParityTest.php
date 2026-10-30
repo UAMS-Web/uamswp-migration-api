@@ -469,8 +469,8 @@ it('pins the same PHP version on both sides', function (): void {
     $php = ciLocalConfig()['config']['php'] ?? null;
 
     expect($php)->toBe('8.4')
-        // The development PHP: Pest 5 requires 8.4, and every PHPUnit 13
-        // release needs 8.4.1, which `config.platform.php` names (#375).
+        // The development PHP: Pest 5 requires 8.4, and `config.platform.php`
+        // names the latest 8.4 patch, 8.4.27 (#375, #38).
         ->and(ciWorkflowSource())->toContain("php-version: '8.4'");
 });
 

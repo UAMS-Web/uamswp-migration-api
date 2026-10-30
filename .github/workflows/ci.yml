@@ -140,8 +140,8 @@ defaults:
 #
 # PHP 8.4 FOR THE CHAIN, PHP 8.2 FOR THE FLOOR (#375, superseding D-019's
 # 8.2-everywhere). The unit suite runs on Pest 5, which requires PHP 8.4, and
-# `config.platform.php` is 8.4.1, the oldest PHP every PHPUnit 13 release
-# installs on. Production runs 8.2.30, and no test runs there, so the floor is
+# `config.platform.php` is 8.4.27, the latest 8.4 patch release (#38).
+# Production runs 8.2.30, and no test runs there, so the floor is
 # guarded four ways: Rector's `withPhpVersion` and PHPStan's `phpVersion.min`
 # name 8.2, `lint-floor` parses every shipped PHP file with PHP 8.2 itself, and
 # `floor-functions` asks PHP 8.2 about each call to a function a development
